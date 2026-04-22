@@ -28,9 +28,26 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.1.10 — friends-and-family bootstrap. No admin rights required except
+    v0.1.11 — friends-and-family bootstrap. No admin rights required except
     for the VC++ Redist step (which UAC-elevates itself silently via the
     manifest embedded in vc_redist.x64.exe).
+
+    Changes from v0.1.10:
+      - Fix Test-Path $path -and (...) parse bug in step 7. PowerShell 5.1
+        parses `Test-Path $var -and $other` as `Test-Path -and` where `-and`
+        is a parameter to Test-Path, not a boolean operator. Now parenthesized
+        correctly. This was what produced the "A parameter cannot be found
+        that matches parameter name 'and'" error observed during v0.1.10
+        sandbox test.
+      - Fix git clone stderr false-alarm. Git prints normal progress to
+        stderr ("Cloning into '...'", etc.). Combined with
+        ErrorActionPreference="Stop" this was landing in the catch block
+        even when the clone itself succeeded. Now passes --quiet to all git
+        commands, temporarily relaxes ErrorActionPreference around native
+        calls, and checks $LASTEXITCODE instead of relying on try/catch.
+      - If a re-run's git fetch+reset fails (e.g. network blip), fall
+        through to a fresh git clone automatically instead of aborting the
+        step.
 
     Changes from v0.1.9:
       - Obsidian silent-install verification is now retry-based. electron-
@@ -738,23 +755,45 @@ if (-not (Test-CommandExists "git")) {
     Write-Host "      git isn't on PATH (step 1 should have installed it) - skipping clone." -ForegroundColor Yellow
     Write-Host "      You'll need to run /plugin marketplace add s0phak1ng/paperwik manually." -ForegroundColor Yellow
 } else {
+    # Git uses stderr for its normal progress output ("Cloning into '...'",
+    # "Enumerating objects...", etc.). Combined with ErrorActionPreference="Stop"
+    # that PS sees as a terminating error and jumps to catch even when the
+    # clone succeeded. Two defenses:
+    #   (a) Pass --quiet so git suppresses the progress chatter.
+    #   (b) Temporarily relax ErrorActionPreference + check $LASTEXITCODE
+    #       instead of trusting try/catch for native commands.
+    $prevErrActPref = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     try {
         if (Test-Path (Join-Path $paperwikDir ".git")) {
             # Previously installed: pull the latest so re-runs get fresh code
-            & git -C $paperwikDir fetch --depth 1 origin main 2>&1 | Out-Null
-            & git -C $paperwikDir reset --hard origin/main 2>&1 | Out-Null
-            Write-Host "      Plugin files updated to latest main." -ForegroundColor DarkGray
+            & git -C $paperwikDir fetch --quiet --depth 1 origin main 2>&1 | Out-Null
+            $fetchExit = $LASTEXITCODE
+            & git -C $paperwikDir reset --quiet --hard origin/main 2>&1 | Out-Null
+            $resetExit = $LASTEXITCODE
+            if ($fetchExit -eq 0 -and $resetExit -eq 0) {
+                Write-Host "      Plugin files updated to latest main." -ForegroundColor DarkGray
+            } else {
+                Write-Host "      Plugin update hit a snag (fetch=$fetchExit, reset=$resetExit). Falling back to fresh clone..." -ForegroundColor Yellow
+                Remove-Item -Recurse -Force $paperwikDir -ErrorAction SilentlyContinue
+                & git clone --quiet --depth 1 "https://github.com/s0phak1ng/paperwik.git" $paperwikDir 2>&1 | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw "git clone exit code $LASTEXITCODE" }
+                Write-Host "      Plugin files cloned." -ForegroundColor DarkGray
+            }
         } else {
             if (Test-Path $paperwikDir) {
                 # Folder exists but isn't a git repo — wipe and re-clone for a clean slate
-                Remove-Item -Recurse -Force $paperwikDir
+                Remove-Item -Recurse -Force $paperwikDir -ErrorAction SilentlyContinue
             }
-            & git clone --depth 1 "https://github.com/s0phak1ng/paperwik.git" $paperwikDir 2>&1 | Out-Null
+            & git clone --quiet --depth 1 "https://github.com/s0phak1ng/paperwik.git" $paperwikDir 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "git clone exit code $LASTEXITCODE" }
             Write-Host "      Plugin files cloned." -ForegroundColor DarkGray
         }
     } catch {
         Write-Host "      git clone failed: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host "      You can fall back to manual install: /plugin marketplace add s0phak1ng/paperwik" -ForegroundColor Yellow
+    } finally {
+        $ErrorActionPreference = $prevErrActPref
     }
 }
 
@@ -816,7 +855,7 @@ if (Test-Path $scaffolder) {
     $env:CLAUDE_PLUGIN_ROOT = $paperwikDir
     # uv was installed in step 6; make sure its bin dir is on PATH for this call
     $uvBinDir = Join-Path $env:USERPROFILE ".local\bin"
-    if (Test-Path $uvBinDir -and (($env:PATH -split ';') -notcontains $uvBinDir)) {
+    if ((Test-Path $uvBinDir) -and (($env:PATH -split ';') -notcontains $uvBinDir)) {
         $env:PATH = "$env:PATH;$uvBinDir"
     }
     try {
