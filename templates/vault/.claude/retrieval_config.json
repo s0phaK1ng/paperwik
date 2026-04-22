@@ -1,0 +1,33 @@
+{
+  "$comment": "Configurable retrieval stack. Each component toggleable. Defaults all-on match CoWork production baseline (NDCG@10 = 0.6683). If any component fails to earn its NDCG contribution on your corpus per the weekly eval harness, toggle it off here.",
+
+  "vector_search": true,
+  "bm25_search": true,
+  "rrf_fusion": true,
+  "query_decomposition": true,
+  "reranker": true,
+  "graph_search": true,
+  "adaptive_skip": true,
+
+  "rrf_weights": {
+    "bm25": 0.6,
+    "vector": 0.4
+  },
+  "rrf_k": 60,
+
+  "embedding_model": "nomic-embed-text-v1.5",
+  "embedding_dims": 768,
+  "reranker_model": "ms-marco-MiniLM-L-12-v2",
+
+  "query_decomposition_model": "en_core_web_sm",
+
+  "entity_types": ["PERSON", "CONCEPT", "PAPER", "ORGANIZATION"],
+
+  "project_router": {
+    "auto_split_below_cosine": 0.55,
+    "file_into_closest_above_cosine": 0.55,
+    "start_with_single_project": true,
+    "learn_from_user_overrides": true,
+    "archive_after_days_inactive": 180
+  }
+}

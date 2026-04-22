@@ -1,0 +1,30 @@
+# Paperwik — gitignore
+# The markdown files are the source of truth. Everything ignored here is
+# either regeneratable or should not leak between machines.
+
+# Obsidian workspace/layout state — per-machine, sync-hostile
+.obsidian/workspace.json
+.obsidian/workspaces.json
+.obsidian/workspace-mobile.json
+
+# Obsidian plugin binaries — installed per-user; community-plugins.json stays
+.obsidian/plugins/
+
+# Agent state — machine-local text memory
+.claude/skills/state/
+.claude/.scaffolded
+.claude/.last-update-notes.md
+.claude/.last-update-notes.read.md
+
+# Retrieval index — regeneratable from markdown via the rebuild-index skill
+knowledge.db
+knowledge.db-shm
+knowledge.db-wal
+
+# Rollback snapshots
+.claude.pre-update-*
+.claude.backup-*
+
+# Python caches (just in case)
+__pycache__/
+*.pyc

@@ -1,0 +1,29 @@
+# Paperwik plugin repo .gitignore
+# (Separate from the vault .gitignore inside templates/vault/ — that one
+#  ships to end users; this one is for the plugin repo itself.)
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# uv / Python venvs (shouldn't exist in repo but just in case)
+.venv/
+venv/
+env/
+
+# OS / editor scratch
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Build artifacts (none expected, but defensive)
+dist/
+build/
+*.egg-info/

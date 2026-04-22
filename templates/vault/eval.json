@@ -1,0 +1,10 @@
+{
+  "$comment": "20-question retrieval eval set. Fill in during the day-one training session. Each entry: a real question you'd want to ask your wiki after 6 months of use, plus the page paths that should appear in the top results. The weekly eval cron runs these questions against your current wiki state and computes NDCG@10, MRR, and Recall@5.",
+
+  "schema_version": 1,
+  "created": null,
+  "last_run": null,
+  "last_run_metrics": null,
+
+  "questions": []
+}

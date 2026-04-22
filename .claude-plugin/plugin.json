@@ -1,0 +1,23 @@
+{
+  "name": "paperwik",
+  "description": "Agent-maintained Obsidian knowledge base. The LLM reads your sources, writes summary pages, maintains cross-references, and builds a persistent wiki that compounds over time. Non-technical Windows users never touch a terminal command beyond 'ingest this' or 'what do I know about X'.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Paperwik Maintainer"
+  },
+  "homepage": "https://github.com/s0phak1ng/paperwik",
+  "repository": "https://github.com/s0phak1ng/paperwik",
+  "license": "MIT",
+  "keywords": [
+    "obsidian",
+    "knowledge-base",
+    "wiki",
+    "retrieval",
+    "non-technical",
+    "windows"
+  ],
+  "dependencies": {
+    "claude-code": ">=2.1.90 <3.0.0"
+  },
+  "hooks": "./hooks/hooks.json"
+}

@@ -1,0 +1,16 @@
+{
+  "newFileLocation": "current",
+  "newLinkFormat": "relative",
+  "useMarkdownLinks": true,
+  "attachmentFolderPath": "_Inbox/assets",
+  "alwaysUpdateLinks": true,
+  "promptDelete": false,
+  "showUnsupportedFiles": false,
+  "vimMode": false,
+  "livePreview": true,
+  "readableLineLength": true,
+  "showInlineTitle": true,
+  "showLineNumber": false,
+  "showViewHeader": true,
+  "strictLineBreaks": false
+}
