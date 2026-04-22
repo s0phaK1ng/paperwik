@@ -16,7 +16,14 @@
     day-one session.
 
 .NOTES
-    v0.1.3 — friends-and-family bootstrap. No admin rights required.
+    v0.1.4 — friends-and-family bootstrap. No admin rights required.
+    Changes from v0.1.3:
+      - Made registry fallback in Test-ObsidianInstalled defensive — many
+        uninstall subkeys don't have a DisplayName property, and with the
+        script's ErrorActionPreference=Stop, accessing a missing property
+        threw. Now wraps the enumeration in try/catch and checks property
+        presence before reading.
+
     Changes from v0.1.2:
       - Fixed Obsidian "installed at expected location" check — electron-builder
         NSIS installer puts Obsidian at %LOCALAPPDATA%\Programs\Obsidian\, not
@@ -196,7 +203,8 @@ function Test-ObsidianInstalled {
     foreach ($candidate in $obsidianCandidates) {
         if (Test-Path $candidate) { return $true }
     }
-    # Registry fallback: NSIS/electron-builder writes an uninstall entry
+    # Registry fallback: NSIS/electron-builder writes an uninstall entry.
+    # Many uninstall subkeys lack DisplayName — guard every property access.
     $uninstallKeys = @(
         'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
         'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
@@ -204,11 +212,26 @@ function Test-ObsidianInstalled {
     )
     foreach ($root in $uninstallKeys) {
         if (-not (Test-Path $root)) { continue }
-        $found = Get-ChildItem -Path $root -ErrorAction SilentlyContinue |
-            ForEach-Object { Get-ItemProperty -Path $_.PSPath -ErrorAction SilentlyContinue } |
-            Where-Object { $_.DisplayName -like 'Obsidian*' } |
-            Select-Object -First 1
-        if ($found) { return $true }
+        try {
+            $subkeys = Get-ChildItem -Path $root -ErrorAction SilentlyContinue
+        } catch {
+            continue
+        }
+        foreach ($sk in $subkeys) {
+            try {
+                $props = Get-ItemProperty -Path $sk.PSPath -ErrorAction SilentlyContinue
+                if ($null -eq $props) { continue }
+                # PSObject.Properties gives us safe access without throwing on missing members
+                $displayNameProp = $props.PSObject.Properties['DisplayName']
+                if ($null -eq $displayNameProp) { continue }
+                $displayName = $displayNameProp.Value
+                if ($displayName -and $displayName -like 'Obsidian*') {
+                    return $true
+                }
+            } catch {
+                continue
+            }
+        }
     }
     return $false
 }
