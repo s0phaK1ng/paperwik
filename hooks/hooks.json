@@ -1,88 +1,90 @@
 {
-  "$comment": "Plugin-level hook registration for Paperwik. Claude Code auto-loads this when the plugin is active. Per CoWork inbound knowledge: every hook must (a) exit <1s except SessionStart startup which includes Python bootstrap, (b) emit only JSON or silent stdout, (c) use defensive PowerShell patterns. Matcher syntax per Decision alnum-exact rule: pure alnum = exact string match; any regex metachar = JS regex. ${CLAUDE_PLUGIN_ROOT} is substituted by Claude Code at hook invocation time.",
+  "$comment": "Plugin-level hook registration for Paperwik. Claude Code auto-loads this when the plugin is active. Per CoWork inbound knowledge: every hook must (a) exit <1s except SessionStart startup which includes Python bootstrap, (b) emit only JSON or silent stdout, (c) use defensive PowerShell patterns. Matcher syntax per Decision alnum-exact rule: pure alnum = exact string match; any regex metachar = JS regex. ${CLAUDE_PLUGIN_ROOT} is substituted by Claude Code at hook invocation time. Top-level 'hooks' wrapper is required per Claude Code plugin schema.",
 
-  "PreToolUse": [
-    {
-      "matcher": "*",
-      "hooks": [
-        {
-          "type": "command",
-          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\PreToolUse-Governor.ps1",
-          "timeout_ms": 1000
-        }
-      ]
-    }
-  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\PreToolUse-Governor.ps1",
+            "timeout_ms": 1000
+          }
+        ]
+      }
+    ],
 
-  "SessionStart": [
-    {
-      "matcher": "startup",
-      "hooks": [
-        {
-          "type": "command",
-          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\scaffold-vault-on-session-start.ps1",
-          "timeout_ms": 60000
-        },
-        {
-          "type": "command",
-          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Rehydrate-Memory.ps1",
-          "timeout_ms": 1500
-        }
-      ]
-    },
-    {
-      "matcher": "resume",
-      "hooks": [
-        {
-          "type": "command",
-          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Rehydrate-Memory.ps1",
-          "timeout_ms": 1500
-        }
-      ]
-    },
-    {
-      "matcher": "compact",
-      "hooks": [
-        {
-          "type": "command",
-          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Restore-State.ps1",
-          "timeout_ms": 1500
-        }
-      ]
-    },
-    {
-      "matcher": "clear",
-      "hooks": [
-        {
-          "type": "command",
-          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Rehydrate-Memory.ps1",
-          "timeout_ms": 1500
-        }
-      ]
-    }
-  ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\scaffold-vault-on-session-start.ps1",
+            "timeout_ms": 60000
+          },
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Rehydrate-Memory.ps1",
+            "timeout_ms": 1500
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Rehydrate-Memory.ps1",
+            "timeout_ms": 1500
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Restore-State.ps1",
+            "timeout_ms": 1500
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Rehydrate-Memory.ps1",
+            "timeout_ms": 1500
+          }
+        ]
+      }
+    ],
 
-  "PreCompact": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Save-State.ps1",
-          "timeout_ms": 2000
-        }
-      ]
-    }
-  ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Save-State.ps1",
+            "timeout_ms": 2000
+          }
+        ]
+      }
+    ],
 
-  "Stop": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Rotate-Memory.ps1",
-          "timeout_ms": 1000
-        }
-      ]
-    }
-  ]
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\hooks\\Rotate-Memory.ps1",
+            "timeout_ms": 1000
+          }
+        ]
+      }
+    ]
+  }
 }
