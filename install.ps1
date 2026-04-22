@@ -17,7 +17,29 @@
     day-one session.
 
 .NOTES
-    v0.1.6 — friends-and-family bootstrap. No admin rights required.
+    v0.1.7 — friends-and-family bootstrap. No admin rights required.
+    Changes from v0.1.6:
+      - Fix Claude Desktop installing an ancient 0.14.10 stub instead of
+        the actual latest release. Two traps overlapped:
+          (a) The storage.googleapis.com/osprey-downloads-... Squirrel
+              bucket is frozen at 0.14.10 and does NOT auto-update.
+          (b) Anthropic's own "latest redirect" endpoint
+              (claude.ai/api/desktop/win32/x64/setup/latest/redirect) is
+              behind a Cloudflare bot challenge that blocks scripted
+              fetches - curl and Invoke-WebRequest both get 403. So we
+              can't use it as the download source.
+        Fix: at install time, fetch the microsoft/winget-pkgs manifest
+        folder for Anthropic.Claude from the GitHub contents API, pick
+        the highest [version]-parseable subfolder, fetch its installer
+        YAML from raw.githubusercontent.com, extract the x64 .exe
+        user-scope InstallerUrl, and download directly from
+        downloads.claude.ai (plain CDN, no bot challenge). The manifest
+        trails real latest by hundreds of builds but Claude Desktop
+        auto-updates itself on first launch, so lag is cosmetic.
+        winget stays on as a last-resort fallback.
+        New helper: Get-LatestClaudeDesktopUrl.
+        Step 3 order flipped: direct-from-manifest first, winget second.
+
     Changes from v0.1.5:
       - Pre-empt the Anthropic installer's "add ~/.local/bin to your PATH
         manually" warning. Previously v0.1.2 added the PATH entry AFTER the
@@ -107,6 +129,50 @@ function Download-File {
     param([string]$Url, [string]$Destination)
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing -UserAgent 'Paperwik-Installer/0.1.1' -TimeoutSec 600
+}
+
+function Get-LatestClaudeDesktopUrl {
+    # Return @{ Version; Url } for the most recent x64 .exe user-scope
+    # Claude Desktop build, sourced from the microsoft/winget-pkgs manifest
+    # repo. Why this path:
+    #   * Anthropic's own "latest redirect" endpoint
+    #     (claude.ai/api/desktop/win32/x64/setup/latest/redirect) sits
+    #     behind a Cloudflare bot challenge that blocks scripted fetches,
+    #     so we can't rely on it in an installer.
+    #   * The legacy Squirrel bucket (storage.googleapis.com/osprey-
+    #     downloads-.../Claude-Setup-x64.exe) is frozen at an ancient
+    #     0.14.x stub that does NOT auto-update, so we must avoid it.
+    #   * winget-pkgs trails real latest by a few hundred builds but is
+    #     stable and anonymous-fetchable. Claude Desktop auto-updates
+    #     itself after install, so the small lag is harmless.
+    # The actual file lives on downloads.claude.ai, which is plain CDN
+    # (no Cloudflare challenge for the binary itself).
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $headers = @{ 'User-Agent' = 'Paperwik-Installer/0.1.7'; 'Accept' = 'application/vnd.github+json' }
+
+    $apiUrl = 'https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/a/Anthropic/Claude'
+    $dirs = Invoke-RestMethod -Uri $apiUrl -Headers $headers -UseBasicParsing -TimeoutSec 30
+    $versionNames = @($dirs | Where-Object { $_.type -eq 'dir' } | ForEach-Object { $_.name })
+    if (-not $versionNames) { throw "No Anthropic.Claude version folders in winget-pkgs" }
+    $parsed = @($versionNames | ForEach-Object {
+        try { [pscustomobject]@{ Name = $_; Version = [version]$_ } } catch { $null }
+    } | Where-Object { $_ })
+    if (-not $parsed) { throw "Could not parse any Anthropic.Claude version strings" }
+    $latest = ($parsed | Sort-Object -Property Version -Descending | Select-Object -First 1).Name
+
+    $yamlUrl = "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/a/Anthropic/Claude/$latest/Anthropic.Claude.installer.yaml"
+    $yaml = Invoke-RestMethod -Uri $yamlUrl -Headers $headers -UseBasicParsing -TimeoutSec 30
+
+    # Target the single line that declares the x64 .exe installer. The
+    # manifest has 4 installer entries (x64 msix, arm64 msix, x64 exe,
+    # arm64 exe); the URL pattern uniquely identifies the x64 exe.
+    $urlLine = ($yaml -split "`n") | Where-Object {
+        $_ -match 'InstallerUrl:\s*https://downloads\.claude\.ai/releases/win32/x64/[\d\.]+/Claude-[a-f0-9]+\.exe\s*$'
+    } | Select-Object -First 1
+    if (-not $urlLine -or $urlLine -notmatch 'InstallerUrl:\s*(\S+)') {
+        throw "x64 .exe installer URL not found in Anthropic.Claude $latest manifest"
+    }
+    return @{ Version = $latest; Url = $Matches[1] }
 }
 
 # -----------------------------------------------------------------------------
@@ -235,51 +301,61 @@ function Test-ClaudeDesktopInstalled {
 if (Test-ClaudeDesktopInstalled) {
     Write-Host "      Already on your computer, moving on." -ForegroundColor Green
 } else {
-    $winget = Get-Command winget -ErrorAction SilentlyContinue
     $installed = $false
-    if ($winget) {
-        try {
-            winget install -e --id Anthropic.Claude --accept-package-agreements --accept-source-agreements --silent
-            # Squirrel finalize can take a few seconds after winget returns
-            Start-Sleep -Seconds 3
-            if (Test-ClaudeDesktopInstalled) {
-                $installed = $true
-                Write-Host "      Claude Desktop ready (via winget)." -ForegroundColor Green
+
+    # Primary: resolve the current x64 .exe installer URL via the
+    # winget-pkgs manifest on GitHub, then download directly from
+    # downloads.claude.ai (plain CDN, no auth, no bot challenge). See
+    # Get-LatestClaudeDesktopUrl for why we skip Anthropic's official
+    # "latest redirect" endpoint and the frozen osprey bucket.
+    try {
+        Write-Host "      Looking up the latest Claude Desktop release..." -ForegroundColor Yellow
+        $latest = Get-LatestClaudeDesktopUrl
+        Write-Host "      Downloading Claude Desktop $($latest.Version) (~200 MB, takes a minute)..." -ForegroundColor Yellow
+        $claudeExe = Join-Path $env:TEMP "Claude-$($latest.Version).exe"
+        Download-File -Url $latest.Url -Destination $claudeExe
+        Write-Host "      Installing silently..." -ForegroundColor Yellow
+        # --silent is the documented silent switch per the winget manifest
+        $proc = Start-Process -FilePath $claudeExe -ArgumentList '--silent' -Wait -PassThru
+        Start-Sleep -Seconds 5
+        if (Test-ClaudeDesktopInstalled) {
+            $installed = $true
+            Write-Host "      Claude Desktop $($latest.Version) ready." -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "      Couldn't resolve latest release ($($_.Exception.Message)), trying winget..." -ForegroundColor Yellow
+    }
+
+    # Fallback: winget install, which ends up using the same manifest
+    # but goes through winget's own download+install machinery. Only
+    # relevant if GitHub is unreachable or the manifest parse failed.
+    if (-not $installed) {
+        $winget = Get-Command winget -ErrorAction SilentlyContinue
+        if ($winget) {
+            try {
+                winget install -e --id Anthropic.Claude --accept-package-agreements --accept-source-agreements --silent
+                Start-Sleep -Seconds 3
+                if (Test-ClaudeDesktopInstalled) {
+                    $installed = $true
+                    Write-Host "      Claude Desktop ready (via winget; auto-updates on first launch)." -ForegroundColor Green
+                }
+            } catch {
+                Write-Host "      winget fallback also didn't work." -ForegroundColor Yellow
             }
-        } catch {
-            Write-Host "      winget install didn't work, falling back to direct download..." -ForegroundColor Yellow
         }
     }
+
     if (-not $installed) {
-        try {
-            Write-Host "      Downloading Claude Desktop installer (~130 MB)..." -ForegroundColor Yellow
-            # This is the URL claude.ai/download redirects to for Windows x64.
-            # It's the stable "latest" asset — no version pinning needed.
-            $claudeUrl = "https://storage.googleapis.com/osprey-downloads-c02f6a0d-347c-492b-a752-3e0651722e97/nest-win-x64/Claude-Setup-x64.exe"
-            $claudeExe = Join-Path $env:TEMP "Claude-Setup-x64.exe"
-            Download-File -Url $claudeUrl -Destination $claudeExe
-            Write-Host "      Installing silently..." -ForegroundColor Yellow
-            # Squirrel installer: --silent runs without UI, per-user (no admin needed)
-            $proc = Start-Process -FilePath $claudeExe -ArgumentList '--silent' -Wait -PassThru
-            Start-Sleep -Seconds 5
-            if (Test-ClaudeDesktopInstalled) {
-                Write-Host "      Claude Desktop ready." -ForegroundColor Green
-            } else {
-                throw "Installer ran (exit $($proc.ExitCode)) but Claude.exe not found in expected locations"
-            }
-        } catch {
-            Write-Host "      Direct install didn't work: $($_.Exception.Message)" -ForegroundColor Red
-            Write-Host "      Opening Claude's download page so you can grab it by hand..." -ForegroundColor Yellow
-            Start-Process "https://claude.ai/download"
-            Add-Type -AssemblyName System.Windows.Forms
-            [System.Windows.Forms.MessageBox]::Show(
-                "Automatic install didn't work on this machine.`n`nClaude's download page just opened in your browser. Install it manually, then re-run this bootstrap - it'll pick up where we left off.",
-                "Claude Desktop - manual install",
-                [System.Windows.Forms.MessageBoxButtons]::OK,
-                [System.Windows.Forms.MessageBoxIcon]::Information
-            ) | Out-Null
-            exit 1
-        }
+        Write-Host "      Opening Claude's download page so you can grab it by hand..." -ForegroundColor Yellow
+        Start-Process "https://claude.ai/download"
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show(
+            "Automatic install didn't work on this machine.`n`nClaude's download page just opened in your browser. Install it manually, then re-run this bootstrap - it'll pick up where we left off.",
+            "Claude Desktop - manual install",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        ) | Out-Null
+        exit 1
     }
 }
 
