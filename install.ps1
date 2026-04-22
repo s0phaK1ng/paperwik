@@ -4,11 +4,12 @@
     execution: `irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex`
 
 .DESCRIPTION
-    Runs four install commands in sequence:
+    Runs five install commands in sequence:
         1. Install Git for Windows (provides git + git-bash, required by Claude Code)
-        2. Install Claude Code via Anthropic's official script
-        3. Install Obsidian (winget preferred, direct download as fallback)
-        4. Install uv (Python runner used by Paperwik's retrieval scripts)
+        2. Install Claude Code CLI via Anthropic's official script
+        3. Install Claude Desktop (the GUI app end users launch to reach Claude Code)
+        4. Install Obsidian (winget preferred, direct download as fallback)
+        5. Install uv (Python runner used by Paperwik's retrieval scripts)
 
     Does NOT install the plugin itself — plugin install requires Claude Code's
     own /plugin marketplace + /plugin install slash commands, which only work
@@ -16,7 +17,17 @@
     day-one session.
 
 .NOTES
-    v0.1.4 — friends-and-family bootstrap. No admin rights required.
+    v0.1.5 — friends-and-family bootstrap. No admin rights required.
+    Changes from v0.1.4:
+      - Added Claude Desktop install step. Non-technical users launch Claude
+        Code from inside Claude Desktop (not PowerShell), so the GUI app is
+        the real entry point and needs to be on the machine. Uses winget
+        (Anthropic.Claude) with direct-download fallback
+        (storage.googleapis.com/.../Claude-Setup-x64.exe, --silent flag).
+        Verification checks %LOCALAPPDATA%\AnthropicClaude\Claude.exe.
+      - Renumbered to 5 total steps. Banner + final "what next" message
+        updated to point the user at Claude Desktop, not PowerShell.
+
     Changes from v0.1.3:
       - Made registry fallback in Test-ObsidianInstalled defensive — many
         uninstall subkeys don't have a DisplayName property, and with the
@@ -56,7 +67,7 @@ try {
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host "  Hello! Welcome to Paperwik." -ForegroundColor Cyan
-Write-Host "  I'll install four small tools. About 4 minutes total." -ForegroundColor Cyan
+Write-Host "  I'll install five small tools. About 5 minutes total." -ForegroundColor Cyan
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -92,7 +103,7 @@ function Download-File {
 # -----------------------------------------------------------------------------
 # Step 1 — Git for Windows (provides git + git-bash; Claude Code requires bash)
 # -----------------------------------------------------------------------------
-Write-Host "[1/4] Setting up Git for Windows (Claude Code needs git-bash)..." -ForegroundColor Yellow
+Write-Host "[1/5] Setting up Git for Windows (Claude Code needs git-bash)..." -ForegroundColor Yellow
 
 if (Test-CommandExists "git") {
     Write-Host "      Already on your computer, moving on." -ForegroundColor Green
@@ -153,7 +164,7 @@ foreach ($candidate in $bashCandidates) {
 # Step 2 — Claude Code
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/4] Setting up Claude Code (the agent that lives inside Claude Desktop)..." -ForegroundColor Yellow
+Write-Host "[2/5] Setting up Claude Code (the engine that powers Paperwik)..." -ForegroundColor Yellow
 
 if (Test-CommandExists "claude") {
     Write-Host "      Already set up, moving on." -ForegroundColor Green
@@ -187,10 +198,84 @@ if (Test-Path $claudeLocalBin) {
 }
 
 # -----------------------------------------------------------------------------
-# Step 3 — Obsidian
+# Step 3 — Claude Desktop (GUI app; the entry point for non-technical users)
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[3/4] Setting up Obsidian (where you'll read your notes)..." -ForegroundColor Yellow
+Write-Host "[3/5] Setting up Claude Desktop (the app where you'll talk to Claude)..." -ForegroundColor Yellow
+
+# Claude Desktop is a Squirrel/Electron app. Per-user install by default lands
+# the launcher stub at %LOCALAPPDATA%\AnthropicClaude\Claude.exe (this is what
+# the Start menu shortcut points at — versioned payload lives in subfolders
+# like app-<version>\). We check for the stub.
+$claudeDesktopCandidates = @(
+    (Join-Path $env:LOCALAPPDATA "AnthropicClaude\Claude.exe"),     # per-user Squirrel install (default)
+    (Join-Path $env:ProgramFiles "AnthropicClaude\Claude.exe"),     # all-users (rare)
+    "${env:ProgramFiles(x86)}\AnthropicClaude\Claude.exe"
+)
+
+function Test-ClaudeDesktopInstalled {
+    foreach ($candidate in $claudeDesktopCandidates) {
+        if (Test-Path $candidate) { return $true }
+    }
+    return $false
+}
+
+if (Test-ClaudeDesktopInstalled) {
+    Write-Host "      Already on your computer, moving on." -ForegroundColor Green
+} else {
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    $installed = $false
+    if ($winget) {
+        try {
+            winget install -e --id Anthropic.Claude --accept-package-agreements --accept-source-agreements --silent
+            # Squirrel finalize can take a few seconds after winget returns
+            Start-Sleep -Seconds 3
+            if (Test-ClaudeDesktopInstalled) {
+                $installed = $true
+                Write-Host "      Claude Desktop ready (via winget)." -ForegroundColor Green
+            }
+        } catch {
+            Write-Host "      winget install didn't work, falling back to direct download..." -ForegroundColor Yellow
+        }
+    }
+    if (-not $installed) {
+        try {
+            Write-Host "      Downloading Claude Desktop installer (~130 MB)..." -ForegroundColor Yellow
+            # This is the URL claude.ai/download redirects to for Windows x64.
+            # It's the stable "latest" asset — no version pinning needed.
+            $claudeUrl = "https://storage.googleapis.com/osprey-downloads-c02f6a0d-347c-492b-a752-3e0651722e97/nest-win-x64/Claude-Setup-x64.exe"
+            $claudeExe = Join-Path $env:TEMP "Claude-Setup-x64.exe"
+            Download-File -Url $claudeUrl -Destination $claudeExe
+            Write-Host "      Installing silently..." -ForegroundColor Yellow
+            # Squirrel installer: --silent runs without UI, per-user (no admin needed)
+            $proc = Start-Process -FilePath $claudeExe -ArgumentList '--silent' -Wait -PassThru
+            Start-Sleep -Seconds 5
+            if (Test-ClaudeDesktopInstalled) {
+                Write-Host "      Claude Desktop ready." -ForegroundColor Green
+            } else {
+                throw "Installer ran (exit $($proc.ExitCode)) but Claude.exe not found in expected locations"
+            }
+        } catch {
+            Write-Host "      Direct install didn't work: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "      Opening Claude's download page so you can grab it by hand..." -ForegroundColor Yellow
+            Start-Process "https://claude.ai/download"
+            Add-Type -AssemblyName System.Windows.Forms
+            [System.Windows.Forms.MessageBox]::Show(
+                "Automatic install didn't work on this machine.`n`nClaude's download page just opened in your browser. Install it manually, then re-run this bootstrap - it'll pick up where we left off.",
+                "Claude Desktop - manual install",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            ) | Out-Null
+            exit 1
+        }
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Step 4 — Obsidian
+# -----------------------------------------------------------------------------
+Write-Host ""
+Write-Host "[4/5] Setting up Obsidian (where you'll read your notes)..." -ForegroundColor Yellow
 
 $obsidianCandidates = @(
     (Join-Path $env:LOCALAPPDATA "Programs\Obsidian\Obsidian.exe"),  # electron-builder default (per-user)
@@ -280,7 +365,7 @@ if ($obsidianInstalled) {
             Start-Process "https://obsidian.md/download"
             Add-Type -AssemblyName System.Windows.Forms
             [System.Windows.Forms.MessageBox]::Show(
-                "Automatic install didn't work on this machine.`n`nObsidian's download page just opened in your browser. Install it manually, then re-run this bootstrap — it'll pick up where we left off.",
+                "Automatic install didn't work on this machine.`n`nObsidian's download page just opened in your browser. Install it manually, then re-run this bootstrap - it'll pick up where we left off.",
                 "Obsidian - manual install",
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Information
@@ -291,10 +376,10 @@ if ($obsidianInstalled) {
 }
 
 # -----------------------------------------------------------------------------
-# Step 4 — uv (Python runner used by Paperwik's retrieval scripts)
+# Step 5 — uv (Python runner used by Paperwik's retrieval scripts)
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[4/4] Setting up uv (a helper that runs Paperwik's search tools)..." -ForegroundColor Yellow
+Write-Host "[5/5] Setting up uv (a helper that runs Paperwik's search tools)..." -ForegroundColor Yellow
 
 if (Test-CommandExists "uv") {
     Write-Host "      Already on your computer, great." -ForegroundColor Green
@@ -321,8 +406,8 @@ Write-Host ""
 Write-Host "Here's what happens next (your installer will walk you through these):" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  1. Close this window."
-Write-Host "  2. Open Claude Desktop (or a fresh PowerShell, if that's your path)."
-Write-Host "  3. Start Claude Code."
+Write-Host "  2. Open Claude Desktop from your Start menu."
+Write-Host "  3. Start a Claude Code session inside Claude Desktop."
 Write-Host "  4. The first time, Claude will open a browser for you to sign in."
 Write-Host "     Click Approve and come back."
 Write-Host "  5. At the Claude Code prompt, paste these two lines:"
