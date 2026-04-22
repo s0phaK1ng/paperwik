@@ -12,8 +12,8 @@
       "description": "Agent-maintained Obsidian knowledge base. The LLM reads your sources, writes summary pages, maintains cross-references, and builds a persistent wiki that compounds over time. Non-technical Windows users never touch a terminal command beyond 'ingest this' or 'what do I know about X'.",
       "version": "0.1.0",
       "source": {
-        "source": "github",
-        "repo": "s0phak1ng/paperwik"
+        "source": "url",
+        "url": "https://github.com/s0phak1ng/paperwik.git"
       },
       "category": "knowledge-management",
       "homepage": "https://github.com/s0phak1ng/paperwik",
