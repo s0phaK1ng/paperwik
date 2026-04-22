@@ -4,31 +4,52 @@
     execution: `irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex`
 
 .DESCRIPTION
-    Runs six install commands in sequence:
+    Runs seven install commands in sequence:
         1. Install Git for Windows (provides git + git-bash, required by Claude Code)
         2. Install Claude Code CLI via Anthropic's official script
         3. Install Claude Desktop (general chat GUI; not the plugin entry point)
         4. Install Obsidian (winget preferred, direct download as fallback)
-        5. Install Microsoft Visual C++ 2015-2022 Redistributable (x64) —
-           required by onnxruntime + spaCy native extensions that Paperwik's
-           retrieval stack (fastembed + flashrank + spaCy) links against.
-           Missing on fresh Windows Sandbox / minimal Windows installs.
+        5. Install Microsoft Visual C++ 2015-2022 Redistributable (x64)
         6. Install uv (Python runner used by Paperwik's retrieval scripts)
+        7. Install and pre-register the Paperwik plugin, build the Knowledge
+           vault, so the user's first `claude` launch has everything ready —
+           no manual /plugin marketplace add or /plugin install required.
 
-    Does NOT install the plugin itself — plugin install requires Claude Code's
-    own /plugin marketplace + /plugin install slash commands, which only work
-    inside the CLI. The installer walks the user through those during the
-    day-one session.
+    Claude Code reads ~/.claude/settings.json on startup. By pre-cloning the
+    plugin repo to ~/.claude/plugins/marketplaces/paperwik/ and registering
+    it in extraKnownMarketplaces + enabledPlugins, we eliminate the need for
+    the user to type any slash commands. The scaffolder runs at install time
+    (we already have uv + plugin repo on disk) so ~/Knowledge/ exists before
+    Claude Code is even opened.
 
-    NOTE: Paperwik's plugin commands run in the Claude Code CLI (launched by
-    typing `claude` in PowerShell), NOT in Claude Desktop's "Code" tab.
-    Claude Desktop is useful for general chat and is installed for that,
-    but the plugin system only exists in the terminal-hosted CLI.
+    NOTE: Paperwik runs in the Claude Code CLI (terminal, launched by typing
+    `claude` in PowerShell), NOT in Claude Desktop's "Code" tab. Claude
+    Desktop is installed for general chat but the plugin system only exists
+    in the terminal-hosted CLI.
 
 .NOTES
-    v0.1.8 — friends-and-family bootstrap. No admin rights required except
+    v0.1.9 — friends-and-family bootstrap. No admin rights required except
     for the VC++ Redist step (which UAC-elevates itself silently via the
     manifest embedded in vc_redist.x64.exe).
+
+    Changes from v0.1.8:
+      - NEW Step 7: zero-manual-step plugin install. Previously the final
+        message told users to type /plugin marketplace add + /plugin install
+        after the bootstrap. Now:
+          (a) git clone https://github.com/s0phak1ng/paperwik.git to
+              ~/.claude/plugins/marketplaces/paperwik/ (Claude Code's cache
+              path for registered marketplaces)
+          (b) merge extraKnownMarketplaces.paperwik + enabledPlugins into
+              ~/.claude/settings.json (preserves any other user settings via
+              PSCustomObject round-trip)
+          (c) run scripts/scaffold-vault.py directly via uv to create
+              ~/Knowledge/ with full vault template + knowledge.db schema
+        User's first `claude` launch sees the plugin pre-enabled and the
+        vault already present — no /plugin commands, no waiting for the
+        SessionStart hook to build the vault.
+      - Renumbered to 7 total steps. Final-message rewrite drops the
+        /plugin lines entirely; new flow is just: Obsidian point-at-vault,
+        PowerShell claude, OAuth, try an ingest.
 
     Changes from v0.1.7:
       - NEW Step 5: install Microsoft Visual C++ Redistributable. Fresh
@@ -131,7 +152,7 @@ try {
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host "  Hello! Welcome to Paperwik." -ForegroundColor Cyan
-Write-Host "  I'll install six small tools. About 5 minutes total." -ForegroundColor Cyan
+Write-Host "  Setting up in 7 steps. About 5 minutes total." -ForegroundColor Cyan
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -211,7 +232,7 @@ function Get-LatestClaudeDesktopUrl {
 # -----------------------------------------------------------------------------
 # Step 1 — Git for Windows (provides git + git-bash; Claude Code requires bash)
 # -----------------------------------------------------------------------------
-Write-Host "[1/6] Setting up Git for Windows (Claude Code needs git-bash)..." -ForegroundColor Yellow
+Write-Host "[1/7] Setting up Git for Windows (Claude Code needs git-bash)..." -ForegroundColor Yellow
 
 if (Test-CommandExists "git") {
     Write-Host "      Already on your computer, moving on." -ForegroundColor Green
@@ -272,7 +293,7 @@ foreach ($candidate in $bashCandidates) {
 # Step 2 — Claude Code
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/6] Setting up Claude Code (the engine that powers Paperwik)..." -ForegroundColor Yellow
+Write-Host "[2/7] Setting up Claude Code (the engine that powers Paperwik)..." -ForegroundColor Yellow
 
 # The Anthropic installer drops claude.exe into ~/.local/bin and, if that
 # folder isn't in PATH, prints a scary "Add it by opening System Properties
@@ -312,7 +333,7 @@ if (Test-CommandExists "claude") {
 # Step 3 — Claude Desktop (GUI app for general chat; not the Paperwik entry point)
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[3/6] Setting up Claude Desktop (great for general chat; Paperwik runs in PowerShell)..." -ForegroundColor Yellow
+Write-Host "[3/7] Setting up Claude Desktop (great for general chat; Paperwik runs in PowerShell)..." -ForegroundColor Yellow
 
 # Claude Desktop is a Squirrel/Electron app. Per-user install by default lands
 # the launcher stub at %LOCALAPPDATA%\AnthropicClaude\Claude.exe (this is what
@@ -405,7 +426,7 @@ if (Test-ClaudeDesktopInstalled) {
 # Step 4 — Obsidian
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[4/6] Setting up Obsidian (where you'll read your notes)..." -ForegroundColor Yellow
+Write-Host "[4/7] Setting up Obsidian (where you'll read your notes)..." -ForegroundColor Yellow
 
 $obsidianCandidates = @(
     (Join-Path $env:LOCALAPPDATA "Programs\Obsidian\Obsidian.exe"),  # electron-builder default (per-user)
@@ -514,7 +535,7 @@ if ($obsidianInstalled) {
 # failures during the first ingest. Install unconditionally - the Microsoft
 # installer is idempotent and exits quickly if already present.
 Write-Host ""
-Write-Host "[5/6] Setting up Visual C++ Redistributable (needed by the search engine)..." -ForegroundColor Yellow
+Write-Host "[5/7] Setting up Visual C++ Redistributable (needed by the search engine)..." -ForegroundColor Yellow
 
 function Test-VCRedistInstalled {
     (Test-Path "$env:WINDIR\System32\vcruntime140.dll") -and (Test-Path "$env:WINDIR\System32\msvcp140.dll")
@@ -570,7 +591,7 @@ if (Test-VCRedistInstalled) {
 # Step 6 — uv (Python runner used by Paperwik's retrieval scripts)
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[6/6] Setting up uv (a helper that runs Paperwik's search tools)..." -ForegroundColor Yellow
+Write-Host "[6/7] Setting up uv (a helper that runs Paperwik's search tools)..." -ForegroundColor Yellow
 
 $uvExe = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
 
@@ -635,6 +656,135 @@ if (Test-UvAvailable) {
 }
 
 # -----------------------------------------------------------------------------
+# Step 7 — Register + enable the Paperwik plugin + build the Knowledge vault
+# -----------------------------------------------------------------------------
+# Claude Code reads ~/.claude/settings.json on startup. If it sees a marketplace
+# registered in `extraKnownMarketplaces` and a plugin enabled in `enabledPlugins`
+# pointing at that marketplace, it loads the plugin on session start without
+# the user having to type /plugin marketplace add or /plugin install.
+#
+# To avoid a first-launch network hit we also clone the plugin repo directly
+# into the cache location Claude Code expects
+# (~/.claude/plugins/marketplaces/paperwik/). And while we have the plugin on
+# disk we run the scaffolder ourselves so ~/Knowledge/ exists BEFORE the user
+# ever opens Claude Code — no waiting for a SessionStart hook to build the
+# vault, no "where do I point Obsidian" confusion.
+Write-Host ""
+Write-Host "[7/7] Installing Paperwik and building your Knowledge vault..." -ForegroundColor Yellow
+
+$claudeDir = Join-Path $env:USERPROFILE ".claude"
+$settingsPath = Join-Path $claudeDir "settings.json"
+$marketplacesDir = Join-Path $claudeDir "plugins\marketplaces"
+$paperwikDir = Join-Path $marketplacesDir "paperwik"
+
+# Ensure the folder tree exists
+foreach ($d in @($claudeDir, (Join-Path $claudeDir "plugins"), $marketplacesDir)) {
+    if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+}
+
+# --- (a) Clone (or update) the plugin repo -----------------------------------
+if (-not (Test-CommandExists "git")) {
+    Write-Host "      git isn't on PATH (step 1 should have installed it) - skipping clone." -ForegroundColor Yellow
+    Write-Host "      You'll need to run /plugin marketplace add s0phak1ng/paperwik manually." -ForegroundColor Yellow
+} else {
+    try {
+        if (Test-Path (Join-Path $paperwikDir ".git")) {
+            # Previously installed: pull the latest so re-runs get fresh code
+            & git -C $paperwikDir fetch --depth 1 origin main 2>&1 | Out-Null
+            & git -C $paperwikDir reset --hard origin/main 2>&1 | Out-Null
+            Write-Host "      Plugin files updated to latest main." -ForegroundColor DarkGray
+        } else {
+            if (Test-Path $paperwikDir) {
+                # Folder exists but isn't a git repo — wipe and re-clone for a clean slate
+                Remove-Item -Recurse -Force $paperwikDir
+            }
+            & git clone --depth 1 "https://github.com/s0phak1ng/paperwik.git" $paperwikDir 2>&1 | Out-Null
+            Write-Host "      Plugin files cloned." -ForegroundColor DarkGray
+        }
+    } catch {
+        Write-Host "      git clone failed: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "      You can fall back to manual install: /plugin marketplace add s0phak1ng/paperwik" -ForegroundColor Yellow
+    }
+}
+
+# --- (b) Register + enable in ~/.claude/settings.json ------------------------
+# Claude Code merges our entries with anything already there. We use
+# PSCustomObject round-trip to preserve any other fields the user might have
+# set (theme, model, etc.) without forcing us to know their schema.
+$settings = [PSCustomObject]@{}
+if (Test-Path $settingsPath) {
+    try {
+        $raw = Get-Content $settingsPath -Raw -ErrorAction SilentlyContinue
+        if ($raw -and $raw.Trim()) {
+            $parsed = $raw | ConvertFrom-Json -ErrorAction Stop
+            if ($parsed -is [PSCustomObject]) { $settings = $parsed }
+        }
+    } catch {
+        Write-Host "      Warning: existing settings.json wasn't valid JSON. Replacing." -ForegroundColor Yellow
+    }
+}
+
+# extraKnownMarketplaces.paperwik
+$marketplacesProp = $settings.PSObject.Properties['extraKnownMarketplaces']
+if ($null -eq $marketplacesProp -or $null -eq $settings.extraKnownMarketplaces) {
+    $settings | Add-Member -NotePropertyName 'extraKnownMarketplaces' -NotePropertyValue ([PSCustomObject]@{}) -Force
+}
+$paperwikMarketplace = [PSCustomObject]@{
+    source = [PSCustomObject]@{
+        source = 'github'
+        repo   = 's0phak1ng/paperwik'
+    }
+}
+$settings.extraKnownMarketplaces | Add-Member -NotePropertyName 'paperwik' -NotePropertyValue $paperwikMarketplace -Force
+
+# enabledPlugins — filter out any stale paperwik entry, then append a fresh one
+$existingEnabled = @()
+if ($settings.PSObject.Properties['enabledPlugins'] -and $settings.enabledPlugins) {
+    $existingEnabled = @($settings.enabledPlugins | Where-Object {
+        $_ -and $_.PSObject.Properties['name'] -and $_.name -ne 'paperwik'
+    })
+}
+$existingEnabled += [PSCustomObject]@{
+    name        = 'paperwik'
+    marketplace = 'paperwik'
+}
+$settings | Add-Member -NotePropertyName 'enabledPlugins' -NotePropertyValue $existingEnabled -Force
+
+# Write without BOM so the Claude Code JSON parser doesn't choke
+try {
+    $json = $settings | ConvertTo-Json -Depth 12
+    [System.IO.File]::WriteAllText($settingsPath, $json, (New-Object System.Text.UTF8Encoding $false))
+    Write-Host "      Registered paperwik in ~/.claude/settings.json." -ForegroundColor DarkGray
+} catch {
+    Write-Host "      Failed to write settings.json: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# --- (c) Run the scaffolder to build ~/Knowledge now -------------------------
+$scaffolder = Join-Path $paperwikDir "scripts\scaffold-vault.py"
+if (Test-Path $scaffolder) {
+    $env:CLAUDE_PLUGIN_ROOT = $paperwikDir
+    # uv was installed in step 6; make sure its bin dir is on PATH for this call
+    $uvBinDir = Join-Path $env:USERPROFILE ".local\bin"
+    if (Test-Path $uvBinDir -and (($env:PATH -split ';') -notcontains $uvBinDir)) {
+        $env:PATH = "$env:PATH;$uvBinDir"
+    }
+    try {
+        Write-Host "      Building your Knowledge vault (first run takes ~30 seconds while uv fetches Python)..." -ForegroundColor Yellow
+        & uv run $scaffolder 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "      Scaffolder exited $LASTEXITCODE. You may need to launch Claude Code once to complete setup." -ForegroundColor Yellow
+        } else {
+            Write-Host "      Knowledge vault ready at $env:USERPROFILE\Knowledge." -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "      Scaffolder failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "      Launching Claude Code once will retry via the SessionStart hook." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "      Scaffolder script not found (plugin clone may have failed). Launching Claude Code will try again." -ForegroundColor Yellow
+}
+
+# -----------------------------------------------------------------------------
 # Finish — tell user what comes next
 # -----------------------------------------------------------------------------
 Write-Host ""
@@ -642,33 +792,31 @@ Write-Host "===============================================================" -Fo
 Write-Host "  Nice! The setup is done." -ForegroundColor Green
 Write-Host "===============================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Here's what happens next:" -ForegroundColor Cyan
+Write-Host "Everything is installed, registered, and your vault is built." -ForegroundColor Cyan
+Write-Host "Here's how to start using it:" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  1. Close this PowerShell window."
-Write-Host "  2. Open a fresh PowerShell (press Win, type 'powershell', hit Enter)."
-Write-Host "  3. Paste these three lines (one at a time, Enter after each):"
 Write-Host ""
+Write-Host "  2. Open Obsidian." -ForegroundColor White
+Write-Host "     Pick 'Open folder as vault' and point it at:"
+Write-Host "        C:\Users\$env:USERNAME\Knowledge" -ForegroundColor Yellow
+Write-Host "     That's your wiki. Browse it, read the Welcome page."
+Write-Host ""
+Write-Host "  3. Open PowerShell (press Win, type 'powershell', hit Enter)." -ForegroundColor White
+Write-Host "     Then type:"
 Write-Host "        cd ~" -ForegroundColor Yellow
 Write-Host "        claude" -ForegroundColor Yellow
+Write-Host "     First time, Claude opens a browser to sign you in. Click Approve."
 Write-Host ""
-Write-Host "     The first time, Claude will open a browser for you to sign in."
-Write-Host "     Click Approve and come back to the window."
+Write-Host "  4. Try something." -ForegroundColor White
+Write-Host "     Drop a PDF or markdown file into:"
+Write-Host "        C:\Users\$env:USERNAME\Knowledge\_Inbox" -ForegroundColor Yellow
+Write-Host "     Then at the Claude prompt, say:"
+Write-Host "        ingest the new source" -ForegroundColor Yellow
+Write-Host "     Or paste a URL:"
+Write-Host "        ingest https://example.com/some-article" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  4. At the Claude prompt, paste these two commands:"
-Write-Host ""
-Write-Host "        /plugin marketplace add s0phak1ng/paperwik" -ForegroundColor Yellow
-Write-Host "        /plugin install paperwik@paperwik" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "  5. Type '/exit' to quit, then run 'claude' again."
-Write-Host "     On this second launch, your Knowledge vault gets built (30-60s)."
-Write-Host ""
-Write-Host "  6. When you see 'Welcome - your knowledge vault is ready', open"
-Write-Host "     Obsidian and pick 'Open folder as vault' to point at:"
-Write-Host "        C:\Users\$env:USERNAME\Knowledge"
-Write-Host ""
-Write-Host "  Note: use PowerShell (not Claude Desktop's Code tab) for the plugin"
-Write-Host "        commands. Claude Desktop is great for general chat, but the"
-Write-Host "        plugin system only works in the terminal CLI."
+Write-Host "  Any question? Just ask Claude naturally: 'what do I know about X?'"
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Green
 Write-Host ""
