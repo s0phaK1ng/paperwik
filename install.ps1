@@ -17,7 +17,16 @@
     day-one session.
 
 .NOTES
-    v0.1.5 — friends-and-family bootstrap. No admin rights required.
+    v0.1.6 — friends-and-family bootstrap. No admin rights required.
+    Changes from v0.1.5:
+      - Pre-empt the Anthropic installer's "add ~/.local/bin to your PATH
+        manually" warning. Previously v0.1.2 added the PATH entry AFTER the
+        installer ran, which worked but left the user staring at a scary
+        "open System Properties -> Environment Variables ..." instruction
+        they didn't need to follow. Now we create the dir and add it to
+        PATH (both User registry and current session) BEFORE calling the
+        installer, so its PATH check passes and it stays quiet.
+
     Changes from v0.1.4:
       - Added Claude Desktop install step. Non-technical users launch Claude
         Code from inside Claude Desktop (not PowerShell), so the GUI app is
@@ -166,6 +175,27 @@ foreach ($candidate in $bashCandidates) {
 Write-Host ""
 Write-Host "[2/5] Setting up Claude Code (the engine that powers Paperwik)..." -ForegroundColor Yellow
 
+# The Anthropic installer drops claude.exe into ~/.local/bin and, if that
+# folder isn't in PATH, prints a scary "Add it by opening System Properties
+# -> Environment Variables ..." note telling the user to edit environment
+# variables by hand. Pre-empt it: create the folder, make sure it's in both
+# the persisted User PATH and this session's PATH, THEN run their installer.
+# With the PATH check already satisfied, the warning never fires.
+$claudeLocalBin = Join-Path $env:USERPROFILE ".local\bin"
+if (-not (Test-Path $claudeLocalBin)) {
+    New-Item -ItemType Directory -Path $claudeLocalBin -Force | Out-Null
+}
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+$pathEntries = if ($userPath) { $userPath -split ';' | Where-Object { $_ } } else { @() }
+$alreadyPresent = $pathEntries | Where-Object { $_.TrimEnd('\') -eq $claudeLocalBin.TrimEnd('\') }
+if (-not $alreadyPresent) {
+    $newUserPath = if ($userPath) { "$userPath;$claudeLocalBin" } else { $claudeLocalBin }
+    [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
+}
+if (($env:PATH -split ';') -notcontains $claudeLocalBin) {
+    $env:PATH = "$env:PATH;$claudeLocalBin"
+}
+
 if (Test-CommandExists "claude") {
     Write-Host "      Already set up, moving on." -ForegroundColor Green
 } else {
@@ -176,24 +206,6 @@ if (Test-CommandExists "claude") {
         Write-Host "      Hmm, that didn't work: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host "      You can try running it directly: irm https://claude.ai/install.ps1 | iex" -ForegroundColor Red
         exit 1
-    }
-}
-
-# Add Claude Code's install dir to User PATH if it's missing
-# (the Anthropic installer warns about this but doesn't fix it automatically)
-$claudeLocalBin = Join-Path $env:USERPROFILE ".local\bin"
-if (Test-Path $claudeLocalBin) {
-    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $pathEntries = if ($userPath) { $userPath -split ';' | Where-Object { $_ } } else { @() }
-    $alreadyPresent = $pathEntries | Where-Object { $_.TrimEnd('\') -eq $claudeLocalBin.TrimEnd('\') }
-    if (-not $alreadyPresent) {
-        $newUserPath = if ($userPath) { "$userPath;$claudeLocalBin" } else { $claudeLocalBin }
-        [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
-        Write-Host "      (Added $claudeLocalBin to your user PATH.)" -ForegroundColor DarkGray
-    }
-    # Also patch the current session so later steps (and immediate re-run tests) work
-    if (($env:PATH -split ';') -notcontains $claudeLocalBin) {
-        $env:PATH = "$env:PATH;$claudeLocalBin"
     }
 }
 
