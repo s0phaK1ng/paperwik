@@ -4,20 +4,53 @@
     execution: `irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex`
 
 .DESCRIPTION
-    Runs five install commands in sequence:
+    Runs six install commands in sequence:
         1. Install Git for Windows (provides git + git-bash, required by Claude Code)
         2. Install Claude Code CLI via Anthropic's official script
-        3. Install Claude Desktop (the GUI app end users launch to reach Claude Code)
+        3. Install Claude Desktop (general chat GUI; not the plugin entry point)
         4. Install Obsidian (winget preferred, direct download as fallback)
-        5. Install uv (Python runner used by Paperwik's retrieval scripts)
+        5. Install Microsoft Visual C++ 2015-2022 Redistributable (x64) —
+           required by onnxruntime + spaCy native extensions that Paperwik's
+           retrieval stack (fastembed + flashrank + spaCy) links against.
+           Missing on fresh Windows Sandbox / minimal Windows installs.
+        6. Install uv (Python runner used by Paperwik's retrieval scripts)
 
     Does NOT install the plugin itself — plugin install requires Claude Code's
     own /plugin marketplace + /plugin install slash commands, which only work
     inside the CLI. The installer walks the user through those during the
     day-one session.
 
+    NOTE: Paperwik's plugin commands run in the Claude Code CLI (launched by
+    typing `claude` in PowerShell), NOT in Claude Desktop's "Code" tab.
+    Claude Desktop is useful for general chat and is installed for that,
+    but the plugin system only exists in the terminal-hosted CLI.
+
 .NOTES
-    v0.1.7 — friends-and-family bootstrap. No admin rights required.
+    v0.1.8 — friends-and-family bootstrap. No admin rights required except
+    for the VC++ Redist step (which UAC-elevates itself silently via the
+    manifest embedded in vc_redist.x64.exe).
+
+    Changes from v0.1.7:
+      - NEW Step 5: install Microsoft Visual C++ Redistributable. Fresh
+        Windows Sandbox + some minimal Windows installs lack it, which
+        causes onnxruntime (fastembed, flashrank) and spaCy's numpy ops
+        to fail DLL load with a cryptic message during the first ingest.
+        Uses winget (Microsoft.VCRedist.2015+.x64) with direct-download
+        fallback from aka.ms/vs/17/release/vc_redist.x64.exe.
+      - Renumbered to 6 total steps (banner + final message updated).
+      - Harden step 6 (uv): verify ~/.local/bin/uv.exe actually exists
+        after astral's installer runs; if not, download uv directly from
+        GitHub releases. (User hit this silent failure on v0.1.7.)
+      - Bump Download-File timeout 600s -> 1200s for slow networks.
+      - Add MSIX detection to Test-ClaudeDesktopInstalled (avoid trying
+        to reinstall when Claude Desktop was previously installed via
+        winget's MSIX path rather than the user-scope .exe).
+      - Rewrite final "what happens next" message. v0.1.5 pointed users
+        at Claude Desktop's "Code" tab for plugin install, which is wrong
+        — that tab doesn't support /plugin. The plugin commands require
+        the terminal CLI. New message says: open PowerShell, type claude,
+        run the plugin commands, restart.
+
     Changes from v0.1.6:
       - Fix Claude Desktop installing an ancient 0.14.10 stub instead of
         the actual latest release. Two traps overlapped:
@@ -98,7 +131,7 @@ try {
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host "  Hello! Welcome to Paperwik." -ForegroundColor Cyan
-Write-Host "  I'll install five small tools. About 5 minutes total." -ForegroundColor Cyan
+Write-Host "  I'll install six small tools. About 5 minutes total." -ForegroundColor Cyan
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -128,7 +161,7 @@ function Get-LatestGithubAsset {
 function Download-File {
     param([string]$Url, [string]$Destination)
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing -UserAgent 'Paperwik-Installer/0.1.1' -TimeoutSec 600
+    Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing -UserAgent 'Paperwik-Installer/0.1.8' -TimeoutSec 1200
 }
 
 function Get-LatestClaudeDesktopUrl {
@@ -178,7 +211,7 @@ function Get-LatestClaudeDesktopUrl {
 # -----------------------------------------------------------------------------
 # Step 1 — Git for Windows (provides git + git-bash; Claude Code requires bash)
 # -----------------------------------------------------------------------------
-Write-Host "[1/5] Setting up Git for Windows (Claude Code needs git-bash)..." -ForegroundColor Yellow
+Write-Host "[1/6] Setting up Git for Windows (Claude Code needs git-bash)..." -ForegroundColor Yellow
 
 if (Test-CommandExists "git") {
     Write-Host "      Already on your computer, moving on." -ForegroundColor Green
@@ -239,7 +272,7 @@ foreach ($candidate in $bashCandidates) {
 # Step 2 — Claude Code
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/5] Setting up Claude Code (the engine that powers Paperwik)..." -ForegroundColor Yellow
+Write-Host "[2/6] Setting up Claude Code (the engine that powers Paperwik)..." -ForegroundColor Yellow
 
 # The Anthropic installer drops claude.exe into ~/.local/bin and, if that
 # folder isn't in PATH, prints a scary "Add it by opening System Properties
@@ -276,10 +309,10 @@ if (Test-CommandExists "claude") {
 }
 
 # -----------------------------------------------------------------------------
-# Step 3 — Claude Desktop (GUI app; the entry point for non-technical users)
+# Step 3 — Claude Desktop (GUI app for general chat; not the Paperwik entry point)
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[3/5] Setting up Claude Desktop (the app where you'll talk to Claude)..." -ForegroundColor Yellow
+Write-Host "[3/6] Setting up Claude Desktop (great for general chat; Paperwik runs in PowerShell)..." -ForegroundColor Yellow
 
 # Claude Desktop is a Squirrel/Electron app. Per-user install by default lands
 # the launcher stub at %LOCALAPPDATA%\AnthropicClaude\Claude.exe (this is what
@@ -292,9 +325,18 @@ $claudeDesktopCandidates = @(
 )
 
 function Test-ClaudeDesktopInstalled {
+    # Per-user Squirrel .exe install
     foreach ($candidate in $claudeDesktopCandidates) {
         if (Test-Path $candidate) { return $true }
     }
+    # MSIX install (winget sometimes prefers this path on admin installs) —
+    # lands under C:\Program Files\WindowsApps\Claude_<version>_x64__<publisher>\
+    try {
+        $appx = Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -like '*Claude*' -and $_.Publisher -match 'Anthropic'
+        } | Select-Object -First 1
+        if ($appx) { return $true }
+    } catch { }
     return $false
 }
 
@@ -363,7 +405,7 @@ if (Test-ClaudeDesktopInstalled) {
 # Step 4 — Obsidian
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[4/5] Setting up Obsidian (where you'll read your notes)..." -ForegroundColor Yellow
+Write-Host "[4/6] Setting up Obsidian (where you'll read your notes)..." -ForegroundColor Yellow
 
 $obsidianCandidates = @(
     (Join-Path $env:LOCALAPPDATA "Programs\Obsidian\Obsidian.exe"),  # electron-builder default (per-user)
@@ -464,22 +506,131 @@ if ($obsidianInstalled) {
 }
 
 # -----------------------------------------------------------------------------
-# Step 5 — uv (Python runner used by Paperwik's retrieval scripts)
+# Step 5 — Microsoft Visual C++ 2015-2022 Redistributable (x64)
+# -----------------------------------------------------------------------------
+# onnxruntime (used by fastembed + flashrank) and spaCy's compiled numpy ops
+# link against vcruntime140.dll + msvcp140.dll. Fresh Windows Sandbox and some
+# minimal Windows installs ship without them, which causes cryptic DLL load
+# failures during the first ingest. Install unconditionally - the Microsoft
+# installer is idempotent and exits quickly if already present.
+Write-Host ""
+Write-Host "[5/6] Setting up Visual C++ Redistributable (needed by the search engine)..." -ForegroundColor Yellow
+
+function Test-VCRedistInstalled {
+    (Test-Path "$env:WINDIR\System32\vcruntime140.dll") -and (Test-Path "$env:WINDIR\System32\msvcp140.dll")
+}
+
+if (Test-VCRedistInstalled) {
+    Write-Host "      Already on your computer, skipping." -ForegroundColor Green
+} else {
+    $installed = $false
+    # Try winget first (cleaner, self-updating)
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($winget) {
+        try {
+            winget install --id Microsoft.VCRedist.2015+.x64 --silent --accept-package-agreements --accept-source-agreements
+            Start-Sleep -Seconds 2
+            if (Test-VCRedistInstalled) {
+                $installed = $true
+                Write-Host "      VC++ Redist ready (via winget)." -ForegroundColor Green
+            }
+        } catch {
+            Write-Host "      winget install didn't work, falling back to direct download..." -ForegroundColor Yellow
+        }
+    }
+    if (-not $installed) {
+        try {
+            Write-Host "      Downloading the redistributable..." -ForegroundColor Yellow
+            $vc = Join-Path $env:TEMP "vc_redist.x64.exe"
+            Download-File -Url 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -Destination $vc
+            Write-Host "      Installing silently..." -ForegroundColor Yellow
+            # /install /quiet /norestart - Microsoft's silent-install flags for this installer
+            $proc = Start-Process -FilePath $vc -ArgumentList '/install','/quiet','/norestart' -Wait -PassThru
+            Remove-Item $vc -ErrorAction SilentlyContinue
+            # Exit codes: 0 = success, 3010 = success but reboot recommended. Both OK.
+            if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne 3010) {
+                throw "vc_redist installer returned exit code $($proc.ExitCode)"
+            }
+            if (Test-VCRedistInstalled) {
+                Write-Host "      VC++ Redist ready." -ForegroundColor Green
+            } else {
+                throw "Installer ran (exit $($proc.ExitCode)) but vcruntime140.dll / msvcp140.dll not found"
+            }
+        } catch {
+            Write-Host "      VC++ Redist install failed: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "      The retrieval stack won't load without it. Please install manually from:" -ForegroundColor Red
+            Write-Host "        https://aka.ms/vs/17/release/vc_redist.x64.exe" -ForegroundColor Red
+            Start-Process "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+            exit 1
+        }
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Step 6 — uv (Python runner used by Paperwik's retrieval scripts)
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[5/5] Setting up uv (a helper that runs Paperwik's search tools)..." -ForegroundColor Yellow
+Write-Host "[6/6] Setting up uv (a helper that runs Paperwik's search tools)..." -ForegroundColor Yellow
 
-if (Test-CommandExists "uv") {
+$uvExe = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
+
+function Test-UvAvailable {
+    if (Test-CommandExists "uv") { return $true }
+    if (Test-Path $uvExe) { return $true }
+    return $false
+}
+
+if (Test-UvAvailable) {
     Write-Host "      Already on your computer, great." -ForegroundColor Green
 } else {
+    # First try Astral's official installer. It sometimes calls `exit` at the
+    # end which closes the hosting PowerShell process, so we isolate it in a
+    # child process via Start-Process.
+    $installerRan = $false
     try {
-        Invoke-Expression (Invoke-RestMethod -Uri "https://astral.sh/uv/install.ps1" -UseBasicParsing)
-        Write-Host "      uv ready." -ForegroundColor Green
-        Write-Host "      (Heads up: close this window and open a new one so it sees the new setup.)" -ForegroundColor Yellow
+        Start-Process powershell -Wait -ArgumentList `
+            '-NoProfile','-ExecutionPolicy','Bypass', `
+            '-Command','irm https://astral.sh/uv/install.ps1 | iex' | Out-Null
+        Start-Sleep -Seconds 2
+        $installerRan = $true
     } catch {
-        Write-Host "      Hmm, that didn't work: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "      You can try running it directly: irm https://astral.sh/uv/install.ps1 | iex" -ForegroundColor Red
+        Write-Host "      Astral installer didn't run cleanly: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+
+    # Astral's script silently no-ops on some sandboxes. Verify uv.exe actually
+    # landed, and fall back to direct binary download from GitHub if not.
+    if (-not (Test-Path $uvExe)) {
+        if ($installerRan) {
+            Write-Host "      Astral installer didn't drop uv.exe at the expected path; pulling the binary directly..." -ForegroundColor Yellow
+        } else {
+            Write-Host "      Downloading uv binary directly from GitHub releases..." -ForegroundColor Yellow
+        }
+        try {
+            $zipUrl = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip'
+            $zip    = Join-Path $env:TEMP "uv.zip"
+            $dest   = Join-Path $env:USERPROFILE ".local\bin"
+            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            Download-File -Url $zipUrl -Destination $zip
+            Expand-Archive -Path $zip -DestinationPath $dest -Force
+            Remove-Item $zip -ErrorAction SilentlyContinue
+        } catch {
+            Write-Host "      Direct uv download also failed: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "      Please install uv manually from https://astral.sh/uv" -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    if (Test-Path $uvExe) {
+        Write-Host "      uv ready at $uvExe." -ForegroundColor Green
+    } else {
+        Write-Host "      uv is still not where we expected after install." -ForegroundColor Red
+        Write-Host "      Please install it manually from https://astral.sh/uv and re-run this bootstrap." -ForegroundColor Red
         exit 1
+    }
+
+    # Make uv visible to this session so any follow-up work in the same shell sees it
+    if (($env:PATH -split ';') -notcontains (Split-Path -Parent $uvExe)) {
+        $env:PATH = "$env:PATH;$(Split-Path -Parent $uvExe)"
     }
 }
 
@@ -491,21 +642,33 @@ Write-Host "===============================================================" -Fo
 Write-Host "  Nice! The setup is done." -ForegroundColor Green
 Write-Host "===============================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Here's what happens next (your installer will walk you through these):" -ForegroundColor Cyan
+Write-Host "Here's what happens next:" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  1. Close this window."
-Write-Host "  2. Open Claude Desktop from your Start menu."
-Write-Host "  3. Start a Claude Code session inside Claude Desktop."
-Write-Host "  4. The first time, Claude will open a browser for you to sign in."
-Write-Host "     Click Approve and come back."
-Write-Host "  5. At the Claude Code prompt, paste these two lines:"
+Write-Host "  1. Close this PowerShell window."
+Write-Host "  2. Open a fresh PowerShell (press Win, type 'powershell', hit Enter)."
+Write-Host "  3. Paste these three lines (one at a time, Enter after each):"
+Write-Host ""
+Write-Host "        cd ~" -ForegroundColor Yellow
+Write-Host "        claude" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "     The first time, Claude will open a browser for you to sign in."
+Write-Host "     Click Approve and come back to the window."
+Write-Host ""
+Write-Host "  4. At the Claude prompt, paste these two commands:"
 Write-Host ""
 Write-Host "        /plugin marketplace add s0phak1ng/paperwik" -ForegroundColor Yellow
-Write-Host "        /plugin install paperwik" -ForegroundColor Yellow
+Write-Host "        /plugin install paperwik@paperwik" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  6. Restart Claude Code (type '/exit' then start it again)."
-Write-Host "  7. First-time setup runs itself - it takes about 3-5 minutes"
-Write-Host "     while the search pieces download. After that, you're ready."
+Write-Host "  5. Type '/exit' to quit, then run 'claude' again."
+Write-Host "     On this second launch, your Knowledge vault gets built (30-60s)."
+Write-Host ""
+Write-Host "  6. When you see 'Welcome - your knowledge vault is ready', open"
+Write-Host "     Obsidian and pick 'Open folder as vault' to point at:"
+Write-Host "        C:\Users\$env:USERNAME\Knowledge"
+Write-Host ""
+Write-Host "  Note: use PowerShell (not Claude Desktop's Code tab) for the plugin"
+Write-Host "        commands. Claude Desktop is great for general chat, but the"
+Write-Host "        plugin system only works in the terminal CLI."
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Green
 Write-Host ""
