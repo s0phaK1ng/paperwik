@@ -28,9 +28,23 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.1.11 — friends-and-family bootstrap. No admin rights required except
+    v0.1.12 — friends-and-family bootstrap. No admin rights required except
     for the VC++ Redist step (which UAC-elevates itself silently via the
     manifest embedded in vc_redist.x64.exe).
+
+    Changes from v0.1.11:
+      - Apply the same native-command-stderr fix to the `uv run scaffolder`
+        call that v0.1.11 applied to git. uv prints Python-download progress
+        ("Downloading cpython-3.14... (21.3MiB)") to stderr, which with
+        ErrorActionPreference=Stop PS treated as a terminating error and
+        killed the child process mid-download - scaffolder never completed,
+        no Knowledge folder. Fix: locally relax ErrorActionPreference to
+        Continue around the uv call, check $LASTEXITCODE, and additionally
+        use filesystem truth (~/Knowledge/.claude/.scaffolded sentinel) as
+        the authoritative success signal.
+      - Show a clear manual-retry command in the output if the scaffolder
+        call still hits a real failure, so the user can recover without
+        reopening this script.
 
     Changes from v0.1.10:
       - Fix Test-Path $path -and (...) parse bug in step 7. PowerShell 5.1
@@ -850,7 +864,14 @@ try {
 }
 
 # --- (c) Run the scaffolder to build ~/Knowledge now -------------------------
+# Same native-command-stderr trap as git: uv prints download progress
+# ("Downloading cpython-3.14... (21.3MiB)") to stderr, which with
+# ErrorActionPreference="Stop" looks like a terminating error to PS and kills
+# the child process mid-download. Relax ErrorActionPreference locally and use
+# $LASTEXITCODE + filesystem verification as the success signal.
 $scaffolder = Join-Path $paperwikDir "scripts\scaffold-vault.py"
+$vaultRoot = Join-Path $env:USERPROFILE "Knowledge"
+$sentinel = Join-Path $vaultRoot ".claude\.scaffolded"
 if (Test-Path $scaffolder) {
     $env:CLAUDE_PLUGIN_ROOT = $paperwikDir
     # uv was installed in step 6; make sure its bin dir is on PATH for this call
@@ -858,17 +879,30 @@ if (Test-Path $scaffolder) {
     if ((Test-Path $uvBinDir) -and (($env:PATH -split ';') -notcontains $uvBinDir)) {
         $env:PATH = "$env:PATH;$uvBinDir"
     }
+    Write-Host "      Building your Knowledge vault (first run takes ~30-60 seconds while uv fetches Python)..." -ForegroundColor Yellow
+    $prevErrActPref = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     try {
-        Write-Host "      Building your Knowledge vault (first run takes ~30 seconds while uv fetches Python)..." -ForegroundColor Yellow
         & uv run $scaffolder 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "      Scaffolder exited $LASTEXITCODE. You may need to launch Claude Code once to complete setup." -ForegroundColor Yellow
-        } else {
-            Write-Host "      Knowledge vault ready at $env:USERPROFILE\Knowledge." -ForegroundColor Green
-        }
+        $uvExit = $LASTEXITCODE
     } catch {
-        Write-Host "      Scaffolder failed: $($_.Exception.Message)" -ForegroundColor Yellow
-        Write-Host "      Launching Claude Code once will retry via the SessionStart hook." -ForegroundColor Yellow
+        # Should not hit this with ErrorActionPreference=Continue, but just in case
+        $uvExit = -1
+        Write-Host "      uv run threw: $($_.Exception.Message)" -ForegroundColor Yellow
+    } finally {
+        $ErrorActionPreference = $prevErrActPref
+    }
+    # Filesystem-based truth: if the sentinel exists, the scaffolder completed
+    # regardless of what uv's exit code said.
+    if (Test-Path $sentinel) {
+        Write-Host "      Knowledge vault ready at $vaultRoot." -ForegroundColor Green
+    } elseif ($uvExit -eq 0) {
+        Write-Host "      uv reported success but sentinel is missing. Run again or launch Claude Code to retry." -ForegroundColor Yellow
+    } else {
+        Write-Host "      Scaffolder exited $uvExit. Launching Claude Code once will retry via the SessionStart hook." -ForegroundColor Yellow
+        Write-Host "      Or you can re-run the scaffolder manually:" -ForegroundColor DarkGray
+        Write-Host "        `$env:CLAUDE_PLUGIN_ROOT = '$paperwikDir'" -ForegroundColor DarkGray
+        Write-Host "        uv run '$scaffolder'" -ForegroundColor DarkGray
     }
 } else {
     Write-Host "      Scaffolder script not found (plugin clone may have failed). Launching Claude Code will try again." -ForegroundColor Yellow
