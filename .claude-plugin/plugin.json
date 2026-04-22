@@ -15,9 +15,5 @@
     "retrieval",
     "non-technical",
     "windows"
-  ],
-  "dependencies": {
-    "claude-code": ">=2.1.90 <3.0.0"
-  },
-  "hooks": "./hooks/hooks.json"
+  ]
 }
