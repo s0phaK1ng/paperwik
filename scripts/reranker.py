@@ -54,6 +54,19 @@ def _get_ranker():
     return _ranker
 
 
+def _rerank_call(ranker, query: str, passages: list[dict]) -> list[dict]:
+    """Call ranker.rerank() across flashrank API versions.
+
+    Older versions: ranker.rerank(query=..., passages=...)
+    Newer versions (>=0.2.9): ranker.rerank(RerankRequest(query=..., passages=...))
+    """
+    try:
+        from flashrank import RerankRequest  # type: ignore
+        return ranker.rerank(RerankRequest(query=query, passages=passages))
+    except ImportError:
+        return ranker.rerank(query=query, passages=passages)
+
+
 def _sigmoid(x: float) -> float:
     """Standard logistic sigmoid — maps raw cross-encoder scores to (0, 1)."""
     if x >= 0:
@@ -83,9 +96,11 @@ def rerank(query: str, candidates: list[dict[str, Any]], top_k: int = 10) -> lis
 
     ranker = _get_ranker()
 
-    # FlashRank expects a list of {"id": ..., "text": ...} dicts
-    passages = [{"id": str(c["id"]), "text": c["text"]} for c in candidates]
-    raw = ranker.rerank(query=query, passages=passages)
+    # FlashRank expects a list of {"id": ..., "text": ...} dicts.
+    # Candidate dicts may use 'text' or 'content' for the passage body (search.py
+    # chunk rows use 'content'; legacy call sites use 'text').
+    passages = [{"id": str(c["id"]), "text": c.get("text") or c.get("content", "")} for c in candidates]
+    raw = _rerank_call(ranker, query, passages)
 
     # raw is a list of dicts with 'id', 'text', 'score' (raw logit)
     # map id -> score

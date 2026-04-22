@@ -55,7 +55,7 @@ def load_fastembed() -> bool:
     try:
         from fastembed import TextEmbedding
 
-        model = TextEmbedding(model_name="nomic-embed-text-v1.5", threads=4)
+        model = TextEmbedding(model_name="nomic-ai/nomic-embed-text-v1.5", threads=4)
         # Warm up — also confirms the model actually loaded
         _ = list(model.embed(["warmup"]))
         log("Embedding model ready.")
@@ -73,8 +73,13 @@ def load_flashrank() -> bool:
         from flashrank import Ranker
 
         ranker = Ranker(model_name="ms-marco-MiniLM-L-12-v2")
-        # Warm up with a trivial rerank to materialize the model on disk
-        _ = ranker.rerank(query="warmup", passages=[{"id": 1, "text": "warmup"}])
+        # Warm up with a trivial rerank to materialize the model on disk.
+        # Newer flashrank versions take a RerankRequest object; older ones use kwargs.
+        try:
+            from flashrank import RerankRequest
+            _ = ranker.rerank(RerankRequest(query="warmup", passages=[{"id": "1", "text": "warmup"}]))
+        except ImportError:
+            _ = ranker.rerank(query="warmup", passages=[{"id": 1, "text": "warmup"}])
         log("Reranker ready.")
         return True
     except Exception as exc:

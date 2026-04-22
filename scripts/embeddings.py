@@ -31,7 +31,7 @@ from typing import Iterable
 # Lazy import of fastembed — only load on first real call so scaffolder doesn't pay the cost
 _model = None
 _model_lock = threading.Lock()
-MODEL_NAME = "nomic-embed-text-v1.5"
+MODEL_NAME = "nomic-ai/nomic-embed-text-v1.5"
 EMBED_DIM = 768
 THREADS = 4
 

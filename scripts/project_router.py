@@ -322,13 +322,22 @@ def auto_archive_inactive(conn: sqlite3.Connection, days: int = ARCHIVE_AFTER_DA
 #  CLI
 # --------------------------------------------------------------------------- #
 
+# nomic-embed-text-v1.5 has an ~8k token / ~32k char context window, but the
+# onnxruntime kernels for its MLP layers allocate intermediate buffers that
+# scale with input size and OOM on low-RAM machines (observed on 4 GB Windows
+# Sandbox during Paperwik v0.1.7 testing with a 48 KB HTML source). Truncating
+# router input is safe: topic routing only needs a coarse embedding, not the
+# full document — the indexer embeds every chunk separately.
+ROUTING_SNIPPET_CHARS = 8000
+
+
 def _cmd_route(content_path: str) -> int:
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
     db_path = user_profile / "Knowledge" / "knowledge.db"
     if not db_path.exists():
         print(f"knowledge.db not found at {db_path}", file=sys.stderr)
         return 1
-    content = Path(content_path).read_text(encoding="utf-8")
+    content = Path(content_path).read_text(encoding="utf-8")[:ROUTING_SNIPPET_CHARS]
     conn = sqlite3.connect(str(db_path))
     try:
         result = route_content(conn, content)
