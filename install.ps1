@@ -16,7 +16,13 @@
     day-one session.
 
 .NOTES
-    v0.1.1 — friends-and-family bootstrap. No admin rights required.
+    v0.1.2 — friends-and-family bootstrap. No admin rights required.
+    Changes from v0.1.1:
+      - Fixed Obsidian asset regex to match actual filename pattern
+        (Obsidian-1.x.y.exe with hyphen, not dot)
+      - Auto-add Claude Code's install dir (~/.local/bin) to user PATH so
+        'claude' command works without the user editing environment variables
+
     Changes from v0.1.0:
       - Added Git for Windows install step (Claude Code needs git-bash)
       - Replaced Unicode banner with ASCII-safe characters
@@ -147,6 +153,24 @@ if (Test-CommandExists "claude") {
     }
 }
 
+# Add Claude Code's install dir to User PATH if it's missing
+# (the Anthropic installer warns about this but doesn't fix it automatically)
+$claudeLocalBin = Join-Path $env:USERPROFILE ".local\bin"
+if (Test-Path $claudeLocalBin) {
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $pathEntries = if ($userPath) { $userPath -split ';' | Where-Object { $_ } } else { @() }
+    $alreadyPresent = $pathEntries | Where-Object { $_.TrimEnd('\') -eq $claudeLocalBin.TrimEnd('\') }
+    if (-not $alreadyPresent) {
+        $newUserPath = if ($userPath) { "$userPath;$claudeLocalBin" } else { $claudeLocalBin }
+        [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
+        Write-Host "      (Added $claudeLocalBin to your user PATH.)" -ForegroundColor DarkGray
+    }
+    # Also patch the current session so later steps (and immediate re-run tests) work
+    if (($env:PATH -split ';') -notcontains $claudeLocalBin) {
+        $env:PATH = "$env:PATH;$claudeLocalBin"
+    }
+}
+
 # -----------------------------------------------------------------------------
 # Step 3 — Obsidian
 # -----------------------------------------------------------------------------
@@ -179,7 +203,10 @@ if ($obsidianInstalled) {
     if (-not $installed) {
         try {
             Write-Host "      Fetching the latest Obsidian installer..." -ForegroundColor Yellow
-            $asset = Get-LatestGithubAsset -Repo "obsidianmd/obsidian-releases" -NamePattern '^Obsidian\.[\d\.]+\.exe$'
+            # Matches the standard x64 Windows installer (e.g. "Obsidian-1.12.7.exe").
+            # The leading separator after "Obsidian" has been a hyphen in recent releases
+            # but was a dot in older releases — accept either.
+            $asset = Get-LatestGithubAsset -Repo "obsidianmd/obsidian-releases" -NamePattern '^Obsidian[-\.][\d\.]+\.exe$'
             $obsidianExe = Join-Path $env:TEMP $asset.Name
             Write-Host "      Downloading $($asset.Name) (~100 MB)..." -ForegroundColor Yellow
             Download-File -Url $asset.Url -Destination $obsidianExe
