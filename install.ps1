@@ -16,7 +16,15 @@
     day-one session.
 
 .NOTES
-    v0.1.2 — friends-and-family bootstrap. No admin rights required.
+    v0.1.3 — friends-and-family bootstrap. No admin rights required.
+    Changes from v0.1.2:
+      - Fixed Obsidian "installed at expected location" check — electron-builder
+        NSIS installer puts Obsidian at %LOCALAPPDATA%\Programs\Obsidian\, not
+        %LOCALAPPDATA%\Obsidian\. Previous path list missed this so silent install
+        succeeded but the script reported failure.
+      - Added registry fallback check (HKCU Uninstall key) for robustness.
+      - Bumped post-install settling time from 2s to 5s.
+
     Changes from v0.1.1:
       - Fixed Obsidian asset regex to match actual filename pattern
         (Obsidian-1.x.y.exe with hyphen, not dot)
@@ -178,13 +186,34 @@ Write-Host ""
 Write-Host "[3/4] Setting up Obsidian (where you'll read your notes)..." -ForegroundColor Yellow
 
 $obsidianCandidates = @(
-    (Join-Path $env:LOCALAPPDATA "Obsidian\Obsidian.exe"),
-    (Join-Path $env:ProgramFiles "Obsidian\Obsidian.exe")
+    (Join-Path $env:LOCALAPPDATA "Programs\Obsidian\Obsidian.exe"),  # electron-builder default (per-user)
+    (Join-Path $env:LOCALAPPDATA "Obsidian\Obsidian.exe"),            # legacy path
+    (Join-Path $env:ProgramFiles "Obsidian\Obsidian.exe"),            # all-users install
+    "${env:ProgramFiles(x86)}\Obsidian\Obsidian.exe"                  # 32-bit, rare
 )
-$obsidianInstalled = $false
-foreach ($candidate in $obsidianCandidates) {
-    if (Test-Path $candidate) { $obsidianInstalled = $true; break }
+
+function Test-ObsidianInstalled {
+    foreach ($candidate in $obsidianCandidates) {
+        if (Test-Path $candidate) { return $true }
+    }
+    # Registry fallback: NSIS/electron-builder writes an uninstall entry
+    $uninstallKeys = @(
+        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
+        'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
+        'HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+    )
+    foreach ($root in $uninstallKeys) {
+        if (-not (Test-Path $root)) { continue }
+        $found = Get-ChildItem -Path $root -ErrorAction SilentlyContinue |
+            ForEach-Object { Get-ItemProperty -Path $_.PSPath -ErrorAction SilentlyContinue } |
+            Where-Object { $_.DisplayName -like 'Obsidian*' } |
+            Select-Object -First 1
+        if ($found) { return $true }
+    }
+    return $false
 }
+
+$obsidianInstalled = Test-ObsidianInstalled
 
 if ($obsidianInstalled) {
     Write-Host "      Already on your computer, perfect." -ForegroundColor Green
@@ -211,15 +240,13 @@ if ($obsidianInstalled) {
             Write-Host "      Downloading $($asset.Name) (~100 MB)..." -ForegroundColor Yellow
             Download-File -Url $asset.Url -Destination $obsidianExe
             Write-Host "      Installing silently..." -ForegroundColor Yellow
-            # Obsidian uses electron-builder's NSIS installer — /S does silent install
+            # Obsidian uses electron-builder's NSIS installer. /S for silent, /currentuser
+            # to force per-user install (no admin). Either works but /currentuser is
+            # explicit about where things land.
             $proc = Start-Process -FilePath $obsidianExe -ArgumentList '/S' -Wait -PassThru
-            # Some NSIS builds return 0 even on silent; double-check by looking for the install artifact
-            Start-Sleep -Seconds 2
-            $foundAfter = $false
-            foreach ($candidate in $obsidianCandidates) {
-                if (Test-Path $candidate) { $foundAfter = $true; break }
-            }
-            if ($foundAfter) {
+            # electron-builder NSIS finalize can take several seconds after the process exits
+            Start-Sleep -Seconds 5
+            if (Test-ObsidianInstalled) {
                 Write-Host "      Obsidian ready." -ForegroundColor Green
             } else {
                 throw "Installer ran (exit $($proc.ExitCode)) but Obsidian.exe not found in expected locations"
