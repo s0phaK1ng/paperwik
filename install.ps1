@@ -28,9 +28,27 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.1.9 — friends-and-family bootstrap. No admin rights required except
+    v0.1.10 — friends-and-family bootstrap. No admin rights required except
     for the VC++ Redist step (which UAC-elevates itself silently via the
     manifest embedded in vc_redist.x64.exe).
+
+    Changes from v0.1.9:
+      - Obsidian silent-install verification is now retry-based. electron-
+        builder NSIS finalize timing is unpredictable on Sandbox and slow
+        disks - sometimes the .exe shows up in 2 seconds, sometimes 20+.
+        The previous fixed 5-second sleep failed for the second group.
+        New Wait-ForObsidianInstall helper polls every 5s for up to 45s.
+      - Test-ObsidianInstalled now also checks the Start-menu shortcut
+        (%APPDATA%\Microsoft\Windows\Start Menu\Programs\Obsidian.lnk) as
+        a secondary signal - NSIS creates the shortcut reliably and often
+        before the .exe has finished unpacking, so this catches the cases
+        where the file-based check would otherwise fail.
+      - Honest timing: banner now says "Expect 8-10 minutes on typical
+        home internet" (was "About 5 minutes"). Real observed times on
+        fresh Sandbox: 8-12 minutes end to end with the step 7 scaffolder
+        included.
+      - Obsidian detection failure now prints every path it checked so
+        support diagnosis doesn't require guessing.
 
     Changes from v0.1.8:
       - NEW Step 7: zero-manual-step plugin install. Previously the final
@@ -152,7 +170,7 @@ try {
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host "  Hello! Welcome to Paperwik." -ForegroundColor Cyan
-Write-Host "  Setting up in 7 steps. About 5 minutes total." -ForegroundColor Cyan
+Write-Host "  Setting up in 7 steps. Expect 8-10 minutes on typical home internet." -ForegroundColor Cyan
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -436,11 +454,21 @@ $obsidianCandidates = @(
 )
 
 function Test-ObsidianInstalled {
+    # Primary: Obsidian.exe at one of the known install paths
     foreach ($candidate in $obsidianCandidates) {
         if (Test-Path $candidate) { return $true }
     }
-    # Registry fallback: NSIS/electron-builder writes an uninstall entry.
-    # Many uninstall subkeys lack DisplayName — guard every property access.
+    # Secondary: Start menu shortcut (electron-builder NSIS creates this reliably,
+    # sometimes before the main .exe has finished unpacking on slow disks)
+    $shortcutCandidates = @(
+        (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Obsidian.lnk"),
+        (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\Obsidian.lnk")
+    )
+    foreach ($lnk in $shortcutCandidates) {
+        if (Test-Path $lnk) { return $true }
+    }
+    # Tertiary: uninstall-registry entry (NSIS writes one; many subkeys lack
+    # DisplayName, so guard every property access)
     $uninstallKeys = @(
         'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
         'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
@@ -457,7 +485,6 @@ function Test-ObsidianInstalled {
             try {
                 $props = Get-ItemProperty -Path $sk.PSPath -ErrorAction SilentlyContinue
                 if ($null -eq $props) { continue }
-                # PSObject.Properties gives us safe access without throwing on missing members
                 $displayNameProp = $props.PSObject.Properties['DisplayName']
                 if ($null -eq $displayNameProp) { continue }
                 $displayName = $displayNameProp.Value
@@ -468,6 +495,23 @@ function Test-ObsidianInstalled {
                 continue
             }
         }
+    }
+    return $false
+}
+
+function Wait-ForObsidianInstall {
+    # electron-builder NSIS finalize timing is unpredictable on Sandbox/slow
+    # disks — sometimes 2 seconds, sometimes 20+. Retry up to ~45 seconds.
+    param([int]$TimeoutSeconds = 45)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $attempt = 0
+    while ((Get-Date) -lt $deadline) {
+        $attempt++
+        if (Test-ObsidianInstalled) {
+            Write-Host "      Detected Obsidian after $attempt check(s)." -ForegroundColor DarkGray
+            return $true
+        }
+        Start-Sleep -Seconds 5
     }
     return $false
 }
@@ -503,12 +547,19 @@ if ($obsidianInstalled) {
             # to force per-user install (no admin). Either works but /currentuser is
             # explicit about where things land.
             $proc = Start-Process -FilePath $obsidianExe -ArgumentList '/S' -Wait -PassThru
-            # electron-builder NSIS finalize can take several seconds after the process exits
-            Start-Sleep -Seconds 5
-            if (Test-ObsidianInstalled) {
+            $exitCode = $proc.ExitCode
+            Write-Host "      Installer exited with code $exitCode. Waiting for filesystem to settle..." -ForegroundColor DarkGray
+            # electron-builder NSIS finalize is racy; retry detection for up to 45s
+            if (Wait-ForObsidianInstall -TimeoutSeconds 45) {
                 Write-Host "      Obsidian ready." -ForegroundColor Green
             } else {
-                throw "Installer ran (exit $($proc.ExitCode)) but Obsidian.exe not found in expected locations"
+                # Print every path we checked so support diagnostics are easy
+                $checkedPaths = $obsidianCandidates + @(
+                    (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Obsidian.lnk")
+                )
+                Write-Host "      None of these paths exist yet:" -ForegroundColor Red
+                foreach ($p in $checkedPaths) { Write-Host "        $p" -ForegroundColor Red }
+                throw "Installer ran (exit $exitCode) but no Obsidian.exe or Start-menu shortcut materialized within 45s"
             }
         } catch {
             Write-Host "      Direct install didn't work: $($_.Exception.Message)" -ForegroundColor Red
