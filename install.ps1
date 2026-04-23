@@ -28,10 +28,40 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.2.2 — friends-and-family bootstrap. Major architectural change:
-    Paperwik now runs inside Claude Desktop's Code tab (the GUI for
-    Claude Code) instead of a custom terminal launcher. Non-technical
-    users never see a terminal window.
+    v0.2.3 — friends-and-family bootstrap. Fixes a silent marketplace-
+    registration bug discovered during v0.2.2 end-to-end test: Desktop's
+    Plugin UI did not recognize our extraKnownMarketplaces entry and
+    paperwik never appeared in + → Plugins → Personal, even though the
+    CLI accepted the same entry without complaint.
+
+    Changes from v0.2.2:
+      - Fix the extraKnownMarketplaces source shape written to
+        ~/.claude/settings.json. v0.2.2 wrote:
+            "source": { "source": "github", "repo": "s0phak1ng/paperwik" }
+        which the Claude Code CLI accepts but Claude Desktop's Plugin UI
+        silently ignores. v0.2.3 writes the canonical form used by
+        anthropics/claude-plugins-official and accepted by both CLI and
+        Desktop:
+            "source": { "source": "git",
+                        "url": "https://github.com/s0phak1ng/paperwik.git" }
+        Verified empirically: with the github/repo shape, paperwik is
+        invisible in Desktop's + → Plugins browser AND Manage plugins list.
+        With the git/url shape, paperwik appears under Personal and can be
+        enabled.
+      - Update the installer's final message to walk the user through the
+        one-click enablement step inside Desktop's Plugin UI. Even with
+        the correct marketplace shape pre-registered, Desktop still
+        requires an explicit user click at:
+            Claude Desktop → Code tab → + button → Plugins → paperwik →
+            (the + / enable control in the plugin detail panel)
+        before the plugin's skills surface in the / autocomplete and
+        auto-trigger on natural language. The CLI does not need this
+        click - the enabledPlugins flag in settings.json is sufficient
+        there. This is a Desktop-specific UX gate we cannot yet pre-fill
+        from the installer (investigated: the click does not modify
+        settings.json or ~/.claude.json visibly, so the state is either
+        in-memory or in a private Desktop store we haven't located).
+        Flagged in decision #309 for future investigation.
 
     Changes from v0.2.1:
       - Renamed the plugin's internal identifier from "paperwik" to "pw".
@@ -977,8 +1007,8 @@ if ($null -eq $marketplacesProp -or $null -eq $settings.extraKnownMarketplaces) 
 }
 $paperwikMarketplace = [PSCustomObject]@{
     source = [PSCustomObject]@{
-        source = 'github'
-        repo   = 's0phak1ng/paperwik'
+        source = 'git'
+        url    = 'https://github.com/s0phak1ng/paperwik.git'
     }
 }
 $settings.extraKnownMarketplaces | Add-Member -NotePropertyName 'paperwik' -NotePropertyValue $paperwikMarketplace -Force
@@ -1153,12 +1183,19 @@ Write-Host ""
 Write-Host "  4. Click 'New session' and pick this folder when asked:" -ForegroundColor White
 Write-Host "        C:\Users\$env:USERNAME\Paperwik" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  5. Type what you want, like:" -ForegroundColor White
+Write-Host "  5. Turn on Paperwik (one time, takes 5 seconds):" -ForegroundColor White
+Write-Host "       - Click the + button to the left of the chat box" -ForegroundColor White
+Write-Host "       - Click 'Plugins'" -ForegroundColor White
+Write-Host "       - Click 'paperwik' under Personal" -ForegroundColor White
+Write-Host "       - Click the + (or Enable) on the paperwik detail page" -ForegroundColor White
+Write-Host "     After that, Paperwik's skills appear when you type / in the chat." -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  6. Type what you want, like:" -ForegroundColor White
 Write-Host "        ingest https://example.com/an-article-i-want-saved" -ForegroundColor Yellow
 Write-Host "        what do I know about <a topic>?" -ForegroundColor Yellow
 Write-Host "        summarize the last few sources I added" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  6. To browse your wiki visually, open Obsidian from your Start" -ForegroundColor White
+Write-Host "  7. To browse your wiki visually, open Obsidian from your Start" -ForegroundColor White
 Write-Host "     menu. Your vault opens automatically."
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Green
