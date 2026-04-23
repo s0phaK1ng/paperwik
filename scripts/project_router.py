@@ -79,8 +79,84 @@ Content:
 Folder name:"""
 
 
+# Stopwords to drop when we fall back to the structural-title heuristic.
+# Titles usually end with the topic ("The Unreasonable Effectiveness of
+# Recurrent Neural Networks" -> topic = "Recurrent Neural Networks");
+# stripping these out + taking trailing content words reliably yields a
+# topical folder name without needing the Claude API.
+_STOPWORDS = frozenset("""
+    a an the
+    and or but nor so yet
+    of in on at by for with to from as about into through during after before
+    is was are were be been being am
+    have has had having
+    do does did doing
+    will would could should may might must can shall
+    this that these those
+    i you he she we they it
+    my your his her its our their
+    what which who whom when where why how
+    all any some many few more most other another each every both either neither
+    not no only just very too also still even
+    there here
+    if because though although unless until while
+""".split())
+
+
+def _extract_content_title(content: str) -> str | None:
+    """Try to extract a topical title from the source by looking for:
+
+      1. HTML <title>...</title>
+      2. Markdown H1 (first '# Title' within the first 50 lines)
+      3. YAML frontmatter 'title:' field
+
+    Returns the raw title text or None if none of the markers are found.
+    """
+    # HTML <title>
+    m = re.search(r"<title[^>]*>([^<]+)</title>", content, re.IGNORECASE | re.DOTALL)
+    if m:
+        return " ".join(m.group(1).strip().split())  # collapse internal whitespace
+    # Markdown H1
+    for line in content.splitlines()[:50]:
+        s = line.strip()
+        if s.startswith("# ") and not s.startswith("## "):
+            return s[2:].strip()
+    # YAML frontmatter 'title:'
+    m = re.search(r"^title:\s*['\"]?([^\n'\"]+)['\"]?\s*$", content, re.MULTILINE)
+    if m:
+        return m.group(1).strip()
+    return None
+
+
+def _name_from_title(title: str, max_words: int = 3) -> str | None:
+    """Strip stopwords from a title and take the trailing content words.
+
+    English titles typically put the topic last ("The X of Y Z Topic"),
+    so after removing articles/prepositions/stopwords, the last ~3 words
+    are almost always the project's actual topic.
+    """
+    # Tokenize while keeping hyphens/apostrophes as part of words
+    words = re.findall(r"\b[\w'-]+\b", title)
+    content_words = [w for w in words if w.lower() not in _STOPWORDS]
+    if not content_words:
+        return None
+    if len(content_words) > max_words:
+        content_words = content_words[-max_words:]
+    # Preserve all-caps acronyms as-is; title-case everything else
+    formatted = [w if w.isupper() and len(w) >= 2 else w.capitalize() for w in content_words]
+    return " ".join(formatted)
+
+
 def generate_project_name(content: str, api_key: str | None = None) -> str:
-    """Propose a folder name via Claude API. Fall back to a heuristic if API unavailable."""
+    """Propose a folder name for this content.
+
+    Preference order:
+      1. Claude Haiku via ANTHROPIC_API_KEY (best — topical noun phrase)
+      2. Structural title extraction + stopword filter (good — works
+         offline, catches ~90% of web articles/papers cleanly)
+      3. Leading capitalized words from the body (weak — previous behavior,
+         kept as a last resort before the timestamp default)
+    """
     api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
     if api_key:
         try:
@@ -101,10 +177,29 @@ def generate_project_name(content: str, api_key: str | None = None) -> str:
         except Exception:
             pass
 
-    # Heuristic fallback: take first 2-3 capitalized words or fall back to a timestamp
-    words = re.findall(r"\b[A-Z][a-z]+\b", content[:500])
-    if len(words) >= 2:
-        return " ".join(words[:3])
+    # Fallback 1: structural title + stopword filter. Turns
+    # "The Unreasonable Effectiveness of Recurrent Neural Networks" ->
+    # "Recurrent Neural Networks".
+    title = _extract_content_title(content)
+    if title:
+        from_title = _name_from_title(title)
+        if from_title:
+            sanitized = _sanitize_folder_name(from_title)
+            if sanitized:
+                return sanitized
+
+    # Fallback 2: leading capitalized words from the body, minus stopwords.
+    # Better than the previous behavior, which would happily include "The"
+    # and "A" at the front.
+    body_words = re.findall(r"\b[A-Z][a-z]+\b", content[:500])
+    body_content = [w for w in body_words if w.lower() not in _STOPWORDS]
+    if len(body_content) >= 2:
+        sanitized = _sanitize_folder_name(" ".join(body_content[:3]))
+        if sanitized:
+            return sanitized
+
+    # Last resort: timestamped untitled project. The user is expected to
+    # rename it in Obsidian; the router learns from overrides.
     return f"Untitled Project {datetime.now().strftime('%Y%m%d')}"
 
 

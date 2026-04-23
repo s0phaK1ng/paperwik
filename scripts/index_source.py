@@ -3,11 +3,18 @@
 # dependencies = [
 #     "fastembed>=0.4.0",
 #     "anthropic>=0.40.0",
+#     "spacy>=3.7.0",
 # ]
 # ///
 #
 # Python pinned to 3.12.x for wheel compatibility. See embeddings.py
 # for the detailed reason (py-rust-stemmers / MSVC-link shadow).
+#
+# spacy is here because we import graph.py which uses spaCy NER as its
+# fallback entity-extraction path when ANTHROPIC_API_KEY is unset (the
+# default state for Claude Pro/Max OAuth users). Without spacy listed
+# here, `uv run index_source.py` would create an env without spacy and
+# the fallback would silently return empty.
 """
 index_source.py — Chunk, embed, and index a source document into knowledge.db.
 

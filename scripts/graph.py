@@ -1,20 +1,34 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.12,<3.13"
 # dependencies = [
 #     "anthropic>=0.40.0",
+#     "spacy>=3.7.0",
 # ]
 # ///
+#
+# Python pinned to 3.12.x for wheel compatibility. See embeddings.py
+# for the detailed reason (py-rust-stemmers / MSVC-link shadow).
 """
 graph.py — Entity extraction + storage for Paperwik's knowledge graph.
 
 Called at ingest time by ingest-source. Takes a chunk of text, extracts
-entities via Claude API (PERSON / CONCEPT / PAPER / ORGANIZATION), and
-stores them in knowledge.db's graph_entities, entity_relationships, and
-chunk_entities tables.
+entities (PERSON / CONCEPT / PAPER / ORGANIZATION), and stores them in
+knowledge.db's graph_entities, entity_relationships, and chunk_entities
+tables.
 
-Ported from CoWork's framework/graph.py. Gemini branch dropped for v1 —
-dad is authenticated to Claude via OAuth anyway, so reusing that path is
-simpler than adding a Google SDK dependency.
+Extraction backend is dual-path:
+
+1. If ANTHROPIC_API_KEY is set → call Claude Haiku for high-quality
+   extraction including typed relationships between entities.
+2. Otherwise → use spaCy NER (local, no network, no API key) for PERSON,
+   ORG, and WORK_OF_ART labels. No relationships in this path — spaCy's
+   NER doesn't emit them — but chunk↔entity links still populate, so
+   entity-graph search still works.
+
+Target users are on Claude Pro/Max OAuth, which does NOT expose an API
+key. The spaCy fallback is the default path for the target deployment;
+the Claude path is the enhancement for users who happen to have an
+ANTHROPIC_API_KEY set.
 
 Usage:
     from graph import extract_and_store
@@ -28,12 +42,20 @@ import json
 import os
 import sqlite3
 import sys
+import threading
 from datetime import datetime, timezone
 from typing import Any
 
 
 # --------------------------------------------------------------------------- #
-#  Entity extraction via Claude API
+#  Shared types
+# --------------------------------------------------------------------------- #
+
+_VALID_ENTITY_TYPES = {"PERSON", "CONCEPT", "PAPER", "ORGANIZATION"}
+
+
+# --------------------------------------------------------------------------- #
+#  Path 1: Claude API (high-quality, requires ANTHROPIC_API_KEY)
 # --------------------------------------------------------------------------- #
 
 EXTRACTION_PROMPT = """You are an entity extraction system for a personal knowledge base.
@@ -67,23 +89,15 @@ Text to analyze:
 Return only the JSON object."""
 
 
-def extract_entities(chunk_text: str, api_key: str | None = None) -> dict[str, Any]:
-    """Call Claude API to extract entities + relationships from a chunk.
-
-    Returns {"entities": [...], "relationships": [...]} or {"entities": [], "relationships": []} on failure.
-    Never raises — entity extraction failures should not block ingest.
-    """
-    api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        # Fall back: graph stays empty. Entity graph degrades gracefully.
-        return {"entities": [], "relationships": []}
-
+def _extract_via_claude(chunk_text: str, api_key: str) -> dict[str, Any] | None:
+    """Claude Haiku entity extraction. Returns the parsed JSON dict, or None
+    on any failure so the caller can fall back to spaCy."""
     try:
         from anthropic import Anthropic  # type: ignore
     except ImportError:
-        return {"entities": [], "relationships": []}
+        return None
 
-    prompt = EXTRACTION_PROMPT.replace("{TEXT}", chunk_text[:8000])  # Cap to ~8K chars per call
+    prompt = EXTRACTION_PROMPT.replace("{TEXT}", chunk_text[:8000])
 
     try:
         client = Anthropic(api_key=api_key)
@@ -100,14 +114,109 @@ def extract_entities(chunk_text: str, api_key: str | None = None) -> dict[str, A
             if raw.endswith("```"):
                 raw = raw.rsplit("\n", 1)[0]
         data = json.loads(raw)
-        # Sanity-check shape
         if not isinstance(data, dict):
-            return {"entities": [], "relationships": []}
+            return None
         data.setdefault("entities", [])
         data.setdefault("relationships", [])
         return data
     except Exception:
+        return None
+
+
+# --------------------------------------------------------------------------- #
+#  Path 2: spaCy NER (local, no API key required)
+# --------------------------------------------------------------------------- #
+
+# Map spaCy NER labels to our entity types. We intentionally skip GPE/LOC
+# (geographic places), DATE, MONEY, CARDINAL, etc. — they are rarely
+# useful as persistent knowledge-base nodes. WORK_OF_ART covers paper/book
+# titles reasonably well in practice.
+_SPACY_LABEL_MAP = {
+    "PERSON": "PERSON",
+    "ORG": "ORGANIZATION",
+    "WORK_OF_ART": "PAPER",
+}
+
+_spacy_nlp = None
+_spacy_lock = threading.Lock()
+
+
+def _get_spacy():
+    """Lazy-load en_core_web_sm. setup-models.py should have downloaded it
+    during step [5/7] of the bootstrap; if it wasn't, raise and let the
+    caller fall through to the empty-graph path."""
+    global _spacy_nlp
+    if _spacy_nlp is not None:
+        return _spacy_nlp
+    with _spacy_lock:
+        if _spacy_nlp is not None:
+            return _spacy_nlp
+        import spacy  # type: ignore
+        _spacy_nlp = spacy.load("en_core_web_sm")
+    return _spacy_nlp
+
+
+def _extract_via_spacy(chunk_text: str) -> dict[str, Any]:
+    """Local NER via spaCy. PERSON/ORG/WORK_OF_ART only. No relationships —
+    spaCy's default pipeline doesn't emit them and adding a dependency
+    parse just for subject-verb-object tuples would triple per-chunk cost.
+
+    The entity-graph search path in search.py only needs (entity, chunk)
+    pairs to be populated; typed edges are a nice-to-have, not required
+    for the retrieval flow."""
+    try:
+        nlp = _get_spacy()
+    except Exception:
         return {"entities": [], "relationships": []}
+
+    # Same per-call text cap as the Claude path so budgets match
+    doc = nlp(chunk_text[:8000])
+
+    entities: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for ent in doc.ents:
+        if ent.label_ not in _SPACY_LABEL_MAP:
+            continue
+        name = ent.text.strip()
+        # Filter junk: too short, too long, all-numeric
+        if len(name) < 2 or len(name) > 60:
+            continue
+        if name.replace(" ", "").replace("-", "").isdigit():
+            continue
+        key = (name.lower(), ent.label_)
+        if key in seen:
+            continue
+        seen.add(key)
+        entities.append({
+            "name": name,
+            "type": _SPACY_LABEL_MAP[ent.label_],
+            "description": "",  # no description without an LLM; pages are
+                                 # still usable with just the name + type
+        })
+
+    return {"entities": entities, "relationships": []}
+
+
+# --------------------------------------------------------------------------- #
+#  Public API — orchestrates Claude → spaCy → empty
+# --------------------------------------------------------------------------- #
+
+def extract_entities(chunk_text: str, api_key: str | None = None) -> dict[str, Any]:
+    """Extract entities + relationships from a chunk. Never raises.
+
+    Tries Claude Haiku first if ANTHROPIC_API_KEY is available (or passed
+    in). If that path fails or is unavailable, falls back to spaCy NER.
+    If spaCy also fails (e.g. en_core_web_sm not installed), returns an
+    empty graph — ingest continues, but the knowledge graph stays sparse
+    for this chunk.
+    """
+    api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+    if api_key:
+        result = _extract_via_claude(chunk_text, api_key)
+        if result is not None:
+            return result
+    return _extract_via_spacy(chunk_text)
 
 
 # --------------------------------------------------------------------------- #
