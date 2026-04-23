@@ -51,7 +51,6 @@ except ImportError:
 
 AUTO_SPLIT_BELOW = 0.55
 FILE_INTO_CLOSEST_ABOVE = 0.55   # one threshold — no ambiguous middle band
-ARCHIVE_AFTER_DAYS = 180
 
 
 # --------------------------------------------------------------------------- #
@@ -322,7 +321,7 @@ def _create_project(conn: sqlite3.Connection, name: str, centroid: list[float]) 
 
     # Physically create the folder inside the vault
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    folder = user_profile / "Paperwik" / name
+    folder = user_profile / "Paperwik" / "Vault" / "Projects" / name
     folder.mkdir(parents=True, exist_ok=True)
 
     return int(cur.lastrowid)
@@ -390,30 +389,6 @@ def record_override(
         existing_centroid = from_blob(row[1]) if row[1] else corrected_content_emb
         _update_centroid_blend(conn, pid, existing_centroid, corrected_content_emb, alpha=0.2)
     conn.commit()
-
-
-# --------------------------------------------------------------------------- #
-#  Archive inactive projects
-# --------------------------------------------------------------------------- #
-
-def auto_archive_inactive(conn: sqlite3.Connection, days: int = ARCHIVE_AFTER_DAYS) -> list[str]:
-    """Move projects inactive for ≥ `days` to archived=1. Returns the list of archived names."""
-    cutoff = datetime.now(timezone.utc).timestamp() - days * 86400
-    rows = conn.execute(
-        """SELECT id, name, last_activity_ts FROM projects
-           WHERE archived = 0 AND last_activity_ts IS NOT NULL"""
-    ).fetchall()
-    archived_names = []
-    for r in rows:
-        try:
-            ts = datetime.fromisoformat(r[2]).timestamp()
-        except (ValueError, TypeError):
-            continue
-        if ts < cutoff:
-            conn.execute("UPDATE projects SET archived = 1 WHERE id = ?", (int(r[0]),))
-            archived_names.append(r[1])
-    conn.commit()
-    return archived_names
 
 
 # --------------------------------------------------------------------------- #

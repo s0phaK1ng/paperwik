@@ -10,15 +10,32 @@
 r"""
 scaffold-vault.py — First-run setup for Paperwik.
 
-Runs via `uv run` from the SessionStart hook. Idempotent: skips the body if
-the sentinel file %USERPROFILE%\Paperwik\.claude\.scaffolded already exists.
+Runs via `uv run` from the SessionStart hook (or directly from install.ps1).
 
-Responsibilities:
-    1. Create the vault directory tree at %USERPROFILE%\Paperwik\ if missing
-    2. Copy template files from ${CLAUDE_PLUGIN_ROOT}/templates/vault/ into place
-    3. Initialize knowledge.db with the full schema (chunks, graph_entities,
-       entity_relationships, chunk_entities, projects)
-    4. Write the .scaffolded sentinel so subsequent launches skip this work
+Two-layer layout:
+    %USERPROFILE%\Paperwik\          ← system root (Claude Code project dir)
+        CLAUDE.md                    ← agent persona
+        index.md                     ← agent-maintained catalog
+        log.md                       ← agent-maintained audit trail
+        eval.json                    ← retrieval-health questions
+        knowledge.db                 ← retrieval DB (NOT in Obsidian's vault)
+        .claude\                     ← Claude Code config (settings, skills state)
+        .scaffolded                  ← idempotency sentinel
+        Vault\                       ← Obsidian's vault (user-facing only)
+            Welcome.md
+            .obsidian\               ← Obsidian config (themes, hide-rules, plugins)
+            Inbox\                   ← drop-zone for new sources
+            Projects\                ← all project folders nest here
+
+Responsibilities (in order):
+    1. Always: refresh agent-managed config dirs (.claude/ and Vault/.obsidian/)
+       so template fixes propagate to existing installs without forcing the
+       user to wipe and re-scaffold.
+    2. First run only (gated by .scaffolded sentinel): copy the rest of the
+       template tree, init knowledge.db, write the sentinel.
+
+User-content files (Welcome.md, anything in Vault/Projects/ or Vault/Inbox/)
+are NEVER overwritten on re-run, so the user's notes are safe.
 
 The scaffolder deliberately has no external Python dependencies — it uses
 stdlib only so `uv run` doesn't need to resolve anything. Retrieval-stack
@@ -42,9 +59,14 @@ from pathlib import Path
 # --------------------------------------------------------------------------- #
 
 def get_paths() -> dict[str, Path]:
-    """Resolve the canonical Paperwik paths from env vars."""
+    """Resolve the canonical Paperwik paths from env vars.
+
+    paperwik_root is the SYSTEM root where Claude Code runs (cwd).
+    vault_root is the USER-FACING Obsidian vault, nested inside paperwik_root.
+    """
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    vault_root = user_profile / "Paperwik"
+    paperwik_root = user_profile / "Paperwik"
+    vault_root = paperwik_root / "Vault"
     plugin_root_env = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if plugin_root_env:
         plugin_root = Path(plugin_root_env)
@@ -52,17 +74,18 @@ def get_paths() -> dict[str, Path]:
         # Fallback: assume this script lives in <plugin>/scripts/
         plugin_root = Path(__file__).resolve().parent.parent
 
-    template_root = plugin_root / "templates" / "vault"
+    template_root = plugin_root / "templates" / "paperwik"
     documents = user_profile / "Documents"
 
     return {
         "user_profile": user_profile,
+        "paperwik_root": paperwik_root,
         "vault_root": vault_root,
         "plugin_root": plugin_root,
         "template_root": template_root,
         "documents": documents,
-        "sentinel": vault_root / ".claude" / ".scaffolded",
-        "knowledge_db": vault_root / "knowledge.db",
+        "sentinel": paperwik_root / ".claude" / ".scaffolded",
+        "knowledge_db": paperwik_root / "knowledge.db",
         "diag_log": documents / "Paperwik-Diagnostics.log",
     }
 
@@ -91,11 +114,17 @@ def log(msg: str, level: str = "INFO", diag_log: Path | None = None) -> None:
 #  Vault filesystem layout
 # --------------------------------------------------------------------------- #
 
-def copy_template_tree(template_root: Path, vault_root: Path, diag: Path) -> None:
-    """Copy everything under templates/vault/ into the user's vault.
+def copy_template_tree(template_root: Path, paperwik_root: Path, diag: Path) -> None:
+    """Full first-run copy of the template tree into the user's Paperwik dir.
 
-    Uses shutil.copytree with dirs_exist_ok=True so re-running (if sentinel was
-    manually deleted) is safe — existing user content is not clobbered.
+    template_root is plugin/templates/paperwik/ and contains both the system
+    files (CLAUDE.md, index.md, log.md, eval.json, .claude/) AND the
+    user-facing Vault/ subfolder. shutil.copytree with dirs_exist_ok=True
+    overwrites existing files — fine on first run because the user has no
+    customizations yet.
+
+    Subsequent runs use refresh_managed_dirs() (selective overwrite) instead
+    of this function, so user content is preserved.
     """
     if not template_root.exists():
         raise RuntimeError(
@@ -103,13 +132,48 @@ def copy_template_tree(template_root: Path, vault_root: Path, diag: Path) -> Non
             f"Set CLAUDE_PLUGIN_ROOT env var or verify the plugin install."
         )
 
-    log(f"Copying template tree: {template_root} -> {vault_root}", diag_log=diag)
+    log(f"Copying full template tree: {template_root} -> {paperwik_root}", diag_log=diag)
     shutil.copytree(
         src=str(template_root),
-        dst=str(vault_root),
+        dst=str(paperwik_root),
         dirs_exist_ok=True,
     )
-    log("Template tree copied successfully.", diag_log=diag)
+    log("Full template tree copied.", diag_log=diag)
+
+
+def refresh_managed_dirs(template_root: Path, paperwik_root: Path, diag: Path) -> None:
+    """Selectively overwrite agent-managed config dirs from the template.
+
+    Runs on EVERY scaffolder invocation (not gated by sentinel) so that
+    template fixes — like new Obsidian app.json settings or updated Claude
+    settings.json permissions — propagate to existing installs without
+    requiring the user to wipe and re-scaffold.
+
+    Refreshed:
+      - Vault/.obsidian/  (Obsidian config: app.json, community-plugins.json)
+
+    NOT touched on refresh (would risk overwriting user/agent state):
+      - .claude/  (settings.json may have user mods, skills/state has agent
+        memory)
+      - CLAUDE.md, index.md, log.md, eval.json (might be edited)
+      - Vault/Welcome.md, Vault/Inbox/*, Vault/Projects/*  (user content)
+    """
+    refresh_targets = [
+        Path("Vault") / ".obsidian",
+    ]
+    for rel in refresh_targets:
+        src = template_root / rel
+        dst = paperwik_root / rel
+        if not src.exists():
+            log(f"Skipping refresh of {rel}: template source missing.", level="WARN", diag_log=diag)
+            continue
+        log(f"Refreshing managed dir: {rel}", diag_log=diag)
+        # Wipe destination first so removed-from-template files actually disappear
+        if dst.exists():
+            shutil.rmtree(str(dst))
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src=str(src), dst=str(dst))
+    log("Managed-dir refresh complete.", diag_log=diag)
 
 
 # --------------------------------------------------------------------------- #
@@ -265,24 +329,32 @@ def main() -> int:
     paths = get_paths()
     diag = paths["diag_log"]
 
-    # Check sentinel
+    # On every run: refresh agent-managed config dirs so template fixes
+    # (Obsidian app.json, etc.) propagate to existing installs even if the
+    # full scaffold has already happened.
+    paths["paperwik_root"].mkdir(parents=True, exist_ok=True)
+    try:
+        refresh_managed_dirs(paths["template_root"], paths["paperwik_root"], diag)
+    except Exception as exc:
+        # Non-fatal — log and continue. Refresh failures shouldn't block
+        # ingest if the user has a working install.
+        log(f"Managed-dir refresh failed (non-fatal): {exc}", level="WARN", diag_log=diag)
+
+    # Check sentinel — if first-run scaffold has already happened, we're done
     if paths["sentinel"].exists():
-        log("Sentinel file found; scaffold already completed. Skipping.", diag_log=diag)
+        log("Sentinel found; first-run scaffold already done. Refresh-only mode complete.", diag_log=diag)
         return 0
 
     log("First-run scaffold begins.", diag_log=diag)
 
-    # 1. Ensure vault root exists
-    paths["vault_root"].mkdir(parents=True, exist_ok=True)
-
-    # 2. Copy template tree
+    # First-run: copy the full template tree (system + Vault) into ~/Paperwik/
     try:
-        copy_template_tree(paths["template_root"], paths["vault_root"], diag)
+        copy_template_tree(paths["template_root"], paths["paperwik_root"], diag)
     except Exception as exc:
         log(f"FATAL: template copy failed: {exc}", level="ERROR", diag_log=diag)
         return 1
 
-    # 3. Initialize knowledge.db
+    # First-run: initialize knowledge.db (lives at the SYSTEM root, not in Vault/)
     try:
         init_knowledge_db(paths["knowledge_db"], diag)
     except Exception as exc:

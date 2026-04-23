@@ -240,7 +240,7 @@ def _get_db_path() -> Path:
 def _to_vault_relative(source_path: Path) -> str:
     """Return file_path relative to the vault root for the sources table."""
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    vault_root = user_profile / "Paperwik"
+    vault_root = user_profile / "Paperwik" / "Vault"
     try:
         rel = source_path.resolve().relative_to(vault_root.resolve())
         return str(rel).replace("\\", "/")

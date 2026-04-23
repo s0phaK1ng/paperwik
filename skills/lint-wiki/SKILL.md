@@ -33,7 +33,7 @@ before reporting.
 
 ### 1. Orphan pages (no inbound links)
 
-For each `.md` file in the active project folders (not `_Inbox/`, `_Archive/`,
+For each `.md` file in the active project folders (not `Vault/Inbox/`, `Vault/Archive/`,
 or top-level meta files): Grep the entire vault for references to the page's
 filename. If zero matches besides the file itself, flag as orphan.
 
@@ -81,7 +81,7 @@ Query `projects` table in `knowledge.db`:
 ```bash
 uv run -c "
 import sqlite3, os, datetime
-conn = sqlite3.connect(os.path.expanduser('~/Paperwik/knowledge.db'))
+conn = sqlite3.connect(os.path.expanduser('~/Paperwik/Vault/Projects/knowledge.db'))
 cutoff = (datetime.datetime.utcnow() - datetime.timedelta(days=180)).isoformat()
 rows = conn.execute('SELECT name, last_activity_ts FROM projects WHERE archived=0 AND last_activity_ts < ?', (cutoff,)).fetchall()
 for r in rows:

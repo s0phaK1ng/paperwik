@@ -38,10 +38,10 @@ try {
     $timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
 
     # 2. Determine vault root (single-vault architecture)
-    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
+    $paperwikRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
     $normalizedVault = $null
-    if (Test-Path $vaultRoot) {
-        $normalizedVault = (Resolve-Path -Path $vaultRoot).Path
+    if (Test-Path $paperwikRoot) {
+        $normalizedVault = (Resolve-Path -Path $paperwikRoot).Path
     } else {
         # Vault not yet scaffolded (first session). Fall back to cwd as soft boundary.
         $normalizedVault = $payload.cwd

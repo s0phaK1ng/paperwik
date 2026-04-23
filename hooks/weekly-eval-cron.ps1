@@ -17,9 +17,9 @@
 $ErrorActionPreference = "Stop"
 
 try {
-    $vaultRoot = Join-Path $env:USERPROFILE "Paperwik"
-    $evalPath = Join-Path $vaultRoot "eval.json"
-    $dbPath = Join-Path $vaultRoot "knowledge.db"
+    $paperwikRoot = Join-Path $env:USERPROFILE "Paperwik"
+    $evalPath = Join-Path $paperwikRoot "eval.json"
+    $dbPath = Join-Path $paperwikRoot "knowledge.db"
 
     $documents = [Environment]::GetFolderPath("MyDocuments")
     $diagLog = Join-Path $documents "Paperwik-Diagnostics.log"

@@ -1,7 +1,7 @@
 ---
 name: 👑 ingest-source
 description: >
-  Process a source document from the user's _Inbox/ folder and weave it into the
+  Process a source document from the user's Vault/Inbox/ folder and weave it into the
   wiki. Triggers on phrases like "ingest this", "process the new source",
   "add this to my notes", "file this article", "read this for me and file it",
   or any request that asks the agent to integrate fresh material into the
@@ -12,14 +12,33 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 
 # ingest-source
 
-You are about to process a new source and weave it into the user's single-vault
-knowledge base at `%USERPROFILE%\Paperwik\`. This skill is the central
-product operation — do it thoroughly, not quickly.
+You are about to process a new source and weave it into the user's knowledge
+base. This skill is the central product operation — do it thoroughly, not
+quickly.
+
+**Layout** (Paperwik v0.2 onward):
+
+```
+%USERPROFILE%\Paperwik\          ← system root (cwd for Claude Code)
+    CLAUDE.md, knowledge.db, log.md, index.md, eval.json, .claude\
+    Vault\                       ← Obsidian's vault (user-facing only)
+        Welcome.md
+        Inbox\                   ← user drops sources here
+        Projects\                ← all project folders nest here
+            <Project Name>\      ← created by the router
+                <Page>.md
+                Entities\
+                _sources\        ← original source files moved here after ingest
+```
+
+When you write user-facing content (project pages, entity pages, sources),
+write under `Vault\Projects\<Project>\`. When you read system files (log.md,
+index.md, knowledge.db), they're at the system root.
 
 ## Triggers
 
 - "ingest this" / "ingest the new source"
-- "process the file in my _Inbox"
+- "process the file in my Inbox"
 - "add this article to my notes"
 - "read this for me and file it"
 - "file this PDF"
@@ -29,13 +48,13 @@ product operation — do it thoroughly, not quickly.
 
 - User asks a simple question about existing content → use query flow, not ingest
 - User asks to "remember" something conversationally → use auto-file-chat at end of turn, not ingest
-- File in `_Inbox/` is a binary format we can't read (images without OCR, proprietary formats) → tell the user what's missing
+- File in `Vault/Inbox/` is a binary format we can't read (images without OCR, proprietary formats) → tell the user what's missing
 
 ## Flow
 
 ### 1. Locate the source
 
-Glob `_Inbox/` for files newer than the wiki's last ingest log entry (check
+Glob `Vault/Inbox/` for files newer than the wiki's last ingest log entry (check
 `log.md` tail). If multiple candidates, ask the user which one. If exactly one
 recent file, proceed.
 
@@ -70,8 +89,9 @@ folder called 'X' because this source doesn't fit any existing topic closely."*
 ### 4. Write the summary page
 
 Create a new markdown file at
-`%USERPROFILE%\Paperwik\<project_name>\<slug-of-title>.md`. Use the frontmatter
-and structure from step 2. Use standard markdown links — `[Other Page](../Project/Other-Page.md)` — not wikilinks.
+`%USERPROFILE%\Paperwik\Vault\Projects\<project_name>\<slug-of-title>.md`.
+Use the frontmatter and structure from step 2. Use standard markdown links —
+`[Other Page](../Project/Other-Page.md)` — not wikilinks.
 
 ### 5. Create or update entity pages
 
@@ -80,9 +100,10 @@ For each entity the subagent identified:
 - If a matching entity page exists in the target project folder (or
   cross-project via grep), update it: add a "Source:" backlink to the new
   summary page + any new facts the source provides.
-- Otherwise, create a new entity page named after the entity
-  (`<project>/Entities/<Entity Name>.md`) with a stub: who/what/why,
-  tagged appropriately (`#person`, `#concept`, `#paper`, `#organization`).
+- Otherwise, create a new entity page named after the entity at
+  `Vault\Projects\<project>\Entities\<Entity Name>.md` with a stub:
+  who/what/why, tagged appropriately (`#person`, `#concept`, `#paper`,
+  `#organization`).
 
 ### 6. Hand off to the indexer
 
@@ -105,11 +126,11 @@ chunks + embeddings will be handled by search.py when it runs queries.)*
 - `log.md`: append a new entry:
   `## [YYYY-MM-DD HH:MM] ingest | <project_name> | <source title>`
 
-### 8. Move the source out of `_Inbox/`
+### 8. Move the source out of `Vault/Inbox/`
 
-Move the ingested file to `<project_name>/_sources/<filename>` so the Inbox
-only ever contains pending items. Never delete the original — the user can
-always re-read it if the summary misses something.
+Move the ingested file to `Vault/Projects/<project_name>/_sources/<filename>`
+so the Inbox only ever contains pending items. Never delete the original — the
+user can always re-read it if the summary misses something.
 
 ### 9. Report back to the user
 
@@ -128,8 +149,8 @@ in Obsidian's sidebar as you work — mention that if it's the first ingest.
 - **One ingest at a time.** If multiple files await, process them sequentially
   and report at the end. Do not parallelize — it breaks the log and the
   project router's online learning.
-- **Never ingest content the user hasn't placed in `_Inbox/`.** If they paste
-  a URL, offer to fetch + save it into `_Inbox/` first.
+- **Never ingest content the user hasn't placed in `Vault/Inbox/`.** If they paste
+  a URL, offer to fetch + save it into `Vault/Inbox/` first.
 - **Always run the project router.** Never pick a folder heuristically. The
   router is the learning system.
 - **Never delete the raw source after ingest.** Keep it in `<project>/_sources/`.

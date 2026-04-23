@@ -20,8 +20,8 @@
 $ErrorActionPreference = "Stop"
 
 try {
-    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
-    $statePath = Join-Path -Path $vaultRoot -ChildPath ".claude\skills\state\active_context.md"
+    $paperwikRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
+    $statePath = Join-Path -Path $paperwikRoot -ChildPath ".claude\skills\state\active_context.md"
     $maxChars = 10000
 
     if (-not (Test-Path $statePath)) {

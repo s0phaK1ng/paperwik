@@ -20,9 +20,9 @@
 $ErrorActionPreference = "Stop"
 
 try {
-    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
-    $activePath = Join-Path -Path $vaultRoot -ChildPath ".claude\skills\state\active_context.md"
-    $archivePath = Join-Path -Path $vaultRoot -ChildPath ".claude\skills\state\archived_index.md"
+    $paperwikRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
+    $activePath = Join-Path -Path $paperwikRoot -ChildPath ".claude\skills\state\active_context.md"
+    $archivePath = Join-Path -Path $paperwikRoot -ChildPath ".claude\skills\state\archived_index.md"
     $maxChars = 10000
     $keepChars = 8000   # after rotation, active keeps the most recent 8k chars (headroom)
     $timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
