@@ -28,9 +28,23 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.1.18 — friends-and-family bootstrap. No admin rights required except
+    v0.1.19 — friends-and-family bootstrap. No admin rights required except
     for the VC++ Redist step (which UAC-elevates itself silently via the
     manifest embedded in vc_redist.x64.exe).
+
+    Changes from v0.1.18:
+      - templates/vault/.claude/settings.json: open up WebFetch from
+        domain-restricted (github.com, huggingface.co, anthropic.com) to
+        wildcard. Paperwik's whole point is "drop a URL, get it ingested";
+        a narrow allow list contradicts that.
+      - Same file: replaced Write(Paperwik/**) and Edit(Paperwik/**) with
+        Write(**) / Edit(**). The original Write(Knowledge/**) pattern
+        was scoped to the vault root; the v0.1.16 sed rename mangled it
+        into Write(Paperwik/**), which is a dead pattern when cwd IS
+        ~/Paperwik. Wildcard write is fine because the deny list still
+        blocks system paths, .obsidian, .git, .claude/settings.json,
+        knowledge.db, and (newly) CLAUDE.md.
+      - Added WebSearch to allow list.
 
     Changes from v0.1.17:
       - Fix `enabledPlugins` shape in settings.json. Claude Code 2.1.118+
