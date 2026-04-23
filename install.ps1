@@ -28,9 +28,28 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.1.16 — friends-and-family bootstrap. No admin rights required except
+    v0.1.17 — friends-and-family bootstrap. No admin rights required except
     for the VC++ Redist step (which UAC-elevates itself silently via the
     manifest embedded in vc_redist.x64.exe).
+
+    Changes from v0.1.16:
+      - Step 7 (Windows Terminal) now degrades gracefully instead of
+        exiting on failure. v0.1.16 tried to fall back to a Microsoft Store
+        URI when winget wasn't available, but that URI fails on Windows
+        Sandbox (no Store) and stripped enterprise images, leaving the
+        installer dead at step 7. Now: if WT can't be auto-installed,
+        we skip it and continue with a $useWindowsTerminal=$false flag.
+      - Step 8 branches the shortcut creation on $useWindowsTerminal:
+          * WT path: shortcut TargetPath = wt.exe -p Paperwik (themed
+            window with the Paperwik color scheme + profile)
+          * No-WT path: shortcut TargetPath = powershell.exe with the
+            same auto-cd-and-run-claude logic baked into Arguments
+        Same Paperwik icon, same auto-launch UX, just stock console
+        colors instead of the themed window. The user gets a working
+        clickable Paperwik shortcut either way.
+      - WT settings.json merge block also wrapped in if($useWindowsTerminal)
+        so we don't try to create a profile in a settings file that
+        doesn't exist.
 
     Changes from v0.1.15:
       - Renamed the vault folder from ~/Knowledge to ~/Paperwik so the
@@ -795,38 +814,34 @@ function Test-WindowsTerminalInstalled {
     return $false
 }
 
+$useWindowsTerminal = $false   # set true only if WT confirmed available
+
 if (Test-WindowsTerminalInstalled) {
+    $useWindowsTerminal = $true
     Write-Host "      Already on your computer, perfect." -ForegroundColor Green
 } else {
-    $installed = $false
     $winget = Get-Command winget -ErrorAction SilentlyContinue
     if ($winget) {
         try {
             winget install --id Microsoft.WindowsTerminal -e --silent --accept-package-agreements --accept-source-agreements
             Start-Sleep -Seconds 3
             if (Test-WindowsTerminalInstalled) {
-                $installed = $true
+                $useWindowsTerminal = $true
                 Write-Host "      Windows Terminal ready (via winget)." -ForegroundColor Green
+            } else {
+                Write-Host "      winget ran but Windows Terminal didn't materialize. Using a standard PowerShell window instead." -ForegroundColor Yellow
             }
         } catch {
-            Write-Host "      winget install didn't complete cleanly: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "      winget install didn't work: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "      Using a standard PowerShell window for the Paperwik shortcut instead." -ForegroundColor Yellow
         }
-    }
-    if (-not $installed) {
-        # Fallback: open the Microsoft Store page so the user can install
-        # manually. Windows Terminal has no clean unattended .msi/.exe path
-        # outside winget — the MSIX bundle from GitHub Releases requires
-        # specific Windows feature support that varies by build.
-        Write-Host "      Couldn't auto-install. Opening the Microsoft Store page so you can install it..." -ForegroundColor Yellow
-        Start-Process "ms-windows-store://pdp/?productid=9N0DX20HK701"
-        Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.MessageBox]::Show(
-            "Microsoft Store just opened to the Windows Terminal page.`n`nClick 'Get' / 'Install', wait for it to finish, then re-run this bootstrap - it'll pick up where we left off.",
-            "Windows Terminal - manual install",
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Information
-        ) | Out-Null
-        exit 1
+    } else {
+        # No winget (typically Windows Sandbox or stripped enterprise images).
+        # The Microsoft Store URI fallback is unreliable in these environments
+        # too (Sandbox has no Store; some enterprise images strip it). So we
+        # don't try - just degrade to the stock-PowerShell shortcut path.
+        Write-Host "      winget isn't available; skipping Windows Terminal." -ForegroundColor Yellow
+        Write-Host "      Paperwik will use a standard PowerShell window instead - works the same, just less themed." -ForegroundColor Yellow
     }
 }
 
@@ -1041,11 +1056,13 @@ if (Test-Path $iconPng) {
 }
 
 # --- Add Paperwik profile + scheme to Windows Terminal settings.json -----
-# The Windows Terminal app stores its config at this path on Windows 10/11
-# (packaged install via Store/winget). Profile + scheme merged
-# non-destructively so any existing user profiles are preserved.
+# Only if Windows Terminal is actually installed (step 7 may have failed
+# gracefully on Sandbox or stripped Windows installs). The shortcut block
+# below also branches on $useWindowsTerminal to pick the right TargetPath.
 $wtSettingsPath = Join-Path $env:LOCALAPPDATA "Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
 $paperwikProfileGuid = "{8a4f2c91-e7b3-4c5d-9f8a-3b2e6d1c5f7a}"  # stable, hardcoded so re-runs find+update
+
+if ($useWindowsTerminal) {
 
 # Profile that auto-cd's to ~/Paperwik and runs claude. -NoExit keeps the
 # window open if claude exits (so the user sees any error message instead
@@ -1154,8 +1171,13 @@ try {
     Write-Host "      Couldn't write WT settings.json: $($_.Exception.Message)" -ForegroundColor Yellow
 }
 
+}  # end if ($useWindowsTerminal)
+
 # --- Create Start menu + Desktop shortcuts -----------------------------------
-$wtExe = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\wt.exe"
+# TargetPath depends on whether Windows Terminal made it onto the machine.
+# WT path: launches into the themed Paperwik profile.
+# Fallback: stock powershell.exe with the same auto-cd-and-run-claude command
+# baked into Arguments. Visually less polished but functionally identical.
 $wshShell = New-Object -ComObject WScript.Shell
 $shortcutTargets = @(
     @{ Path = (Join-Path ([Environment]::GetFolderPath('Programs')) 'Paperwik.lnk'); Where = 'Start menu' },
@@ -1163,11 +1185,20 @@ $shortcutTargets = @(
 )
 $shortcutIcon = if ($iconIco -and (Test-Path $iconIco)) { "$iconIco,0" } else { "$env:LOCALAPPDATA\AnthropicClaude\Claude.exe,0" }
 
+if ($useWindowsTerminal) {
+    $shortcutTargetPath = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\wt.exe"
+    $shortcutArgs = "-p Paperwik"
+} else {
+    $shortcutTargetPath = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
+    # Same command WT's profile uses, just inline as the shortcut's args.
+    $shortcutArgs = '-NoLogo -NoProfile -NoExit -Command "& { Set-Location $env:USERPROFILE\Paperwik; claude }"'
+}
+
 foreach ($target in $shortcutTargets) {
     try {
         $sc = $wshShell.CreateShortcut($target.Path)
-        $sc.TargetPath = $wtExe
-        $sc.Arguments = "-p Paperwik"
+        $sc.TargetPath = $shortcutTargetPath
+        $sc.Arguments = $shortcutArgs
         $sc.WorkingDirectory = (Join-Path $env:USERPROFILE 'Paperwik')
         $sc.IconLocation = $shortcutIcon
         $sc.Description = "Paperwik - your personal knowledge wiki"
