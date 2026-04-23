@@ -28,10 +28,36 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.2.0 — friends-and-family bootstrap. Major architectural change:
+    v0.2.2 — friends-and-family bootstrap. Major architectural change:
     Paperwik now runs inside Claude Desktop's Code tab (the GUI for
     Claude Code) instead of a custom terminal launcher. Non-technical
     users never see a terminal window.
+
+    Changes from v0.2.1:
+      - Renamed the plugin's internal identifier from "paperwik" to "pw".
+        Brand + marketplace + GitHub repo + install URL all still say
+        "paperwik". Only the plugin id (which drives slash-command
+        namespacing) is short, so slash commands become /pw:ingest,
+        /pw:lint, etc. instead of /paperwik:ingest-source.
+          * plugin.json: name -> "pw", version bumped to 0.2.0
+          * marketplace.json: plugins[].name -> "pw"
+          * install.ps1: settings.json enabledPlugins key is now
+            "pw@paperwik". Also scrubs any stale "paperwik@paperwik" entry
+            from existing installs (migration) so Claude Code doesn't warn
+            about a missing plugin named "paperwik".
+      - Renamed 4 user-facing skills to short imperative verbs:
+          ingest-source  -> ingest
+          lint-wiki      -> lint
+          redact-history -> redact
+          revert-state   -> undo
+        Background-only skills (auto-file-chat, decision-logger,
+        measure-retrieval, proactive-reauth, rebuild-index) keep their
+        descriptive names - user never invokes those directly.
+      - Reverted the 👑 emoji prefix from all skill names. Per the
+        code.claude.com/docs/en/skills schema, skill `name:` fields are
+        restricted to lowercase letters, digits, and hyphens. Emoji names
+        were silently rejected, which is why they didn't appear in /
+        autocomplete AND why auto-trigger wasn't firing.
 
     Changes from v0.1.20:
       - Two-layer filesystem:
@@ -959,24 +985,32 @@ $settings.extraKnownMarketplaces | Add-Member -NotePropertyName 'paperwik' -Note
 
 # enabledPlugins is a record/object keyed by "<plugin>@<marketplace>" with
 # boolean values:
-#     "enabledPlugins": { "paperwik@paperwik": true }
-# Earlier Paperwik versions wrote it as an array of {name, marketplace}
+#     "enabledPlugins": { "pw@paperwik": true }
+# Earlier versions (pre-v0.2.0) used "paperwik@paperwik" since the plugin
+# name was "paperwik". In v0.2.2 we renamed the plugin's internal id to
+# "pw" for a shorter slash-command prefix (/pw:ingest instead of
+# /paperwik:ingest). If the stale "paperwik@paperwik" key is present, drop
+# it - the plugin.json now reports name=pw so Claude Code won't match the
+# old key anyway, and leaving it causes "plugin paperwik not found" noise.
+#
+# Pre-v0.1.18 versions wrote enabledPlugins as an array of {name, marketplace}
 # objects, which Claude Code 2.1.118+ rejects with "Expected record, but
-# received array". If we find that legacy shape, we discard it - it was
-# invalid and Claude Code skipped the whole settings.json on every launch
-# while it was present, so there's no user state to preserve.
+# received array". If we find that legacy shape, we discard it - invalid
+# schema, no user state to preserve.
 $enabledMap = @{}
 if ($settings.PSObject.Properties['enabledPlugins'] -and $settings.enabledPlugins) {
     $existing = $settings.enabledPlugins
     if ($existing -is [PSCustomObject]) {
         # Carry forward any other plugins the user had enabled
         foreach ($p in $existing.PSObject.Properties) {
+            # Skip legacy paperwik@paperwik (superseded by pw@paperwik)
+            if ($p.Name -eq 'paperwik@paperwik') { continue }
             $enabledMap[$p.Name] = $p.Value
         }
     }
     # else: array (legacy/invalid) or scalar - discard
 }
-$enabledMap['paperwik@paperwik'] = $true
+$enabledMap['pw@paperwik'] = $true
 $settings | Add-Member -NotePropertyName 'enabledPlugins' -NotePropertyValue $enabledMap -Force
 
 # Write without BOM so the Claude Code JSON parser doesn't choke

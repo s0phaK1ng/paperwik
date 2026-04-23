@@ -1,7 +1,7 @@
 {
-  "name": "paperwik",
-  "description": "Agent-maintained Obsidian knowledge base. The LLM reads your sources, writes summary pages, maintains cross-references, and builds a persistent wiki that compounds over time. Non-technical Windows users never touch a terminal command beyond 'ingest this' or 'what do I know about X'.",
-  "version": "0.1.0",
+  "name": "pw",
+  "description": "Paperwik — agent-maintained Obsidian knowledge base. The LLM reads your sources, writes summary pages, maintains cross-references, and builds a persistent wiki that compounds over time. Slash commands are prefixed with /pw: for brevity. Marketplace + brand remain 'paperwik'; only the plugin identifier is short.",
+  "version": "0.2.0",
   "author": {
     "name": "Paperwik Maintainer"
   },
