@@ -142,9 +142,23 @@ _spacy_lock = threading.Lock()
 
 
 def _get_spacy():
-    """Lazy-load en_core_web_sm. setup-models.py should have downloaded it
-    during step [5/7] of the bootstrap; if it wasn't, raise and let the
-    caller fall through to the empty-graph path."""
+    """Lazy-load en_core_web_sm.
+
+    setup-models.py downloads en_core_web_sm into ITS uv-managed venv
+    (one specific cached venv hash). graph.py's caller (typically
+    index_source.py) runs in a DIFFERENT uv venv with different deps and
+    therefore a different cache hash, so the model package exists in
+    setup-models's venv but is missing here. Each venv needs its own
+    copy.
+
+    On first call in any new venv: spacy.load() raises OSError, we
+    download the model via spaCy's CLI (one-time ~50MB / ~10s), then
+    retry the load. Subsequent calls in the same venv hit the cached
+    package and load instantly.
+
+    Raises on persistent failure so the caller's try/except in
+    _extract_via_spacy returns the empty graph (degrade gracefully
+    instead of breaking ingest)."""
     global _spacy_nlp
     if _spacy_nlp is not None:
         return _spacy_nlp
@@ -152,7 +166,30 @@ def _get_spacy():
         if _spacy_nlp is not None:
             return _spacy_nlp
         import spacy  # type: ignore
-        _spacy_nlp = spacy.load("en_core_web_sm")
+        try:
+            _spacy_nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            # Model not in this venv. Download it via spaCy's CLI so the
+            # version matches the installed spacy package automatically.
+            print(
+                "[graph.py] en_core_web_sm not found in this venv; downloading "
+                "via `python -m spacy download en_core_web_sm` (one-time, ~10s)...",
+                file=sys.stderr,
+                flush=True,
+            )
+            import subprocess
+            subprocess.check_call(
+                [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=180,
+            )
+            _spacy_nlp = spacy.load("en_core_web_sm")
+            print(
+                "[graph.py] en_core_web_sm download + load complete.",
+                file=sys.stderr,
+                flush=True,
+            )
     return _spacy_nlp
 
 
@@ -166,7 +203,13 @@ def _extract_via_spacy(chunk_text: str) -> dict[str, Any]:
     for the retrieval flow."""
     try:
         nlp = _get_spacy()
-    except Exception:
+    except Exception as exc:
+        print(
+            f"[graph.py] spaCy load failed ({exc.__class__.__name__}: {exc}); "
+            "returning empty graph for this chunk.",
+            file=sys.stderr,
+            flush=True,
+        )
         return {"entities": [], "relationships": []}
 
     # Same per-call text cap as the Claude path so budgets match
