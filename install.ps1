@@ -28,9 +28,20 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.1.17 — friends-and-family bootstrap. No admin rights required except
+    v0.1.18 — friends-and-family bootstrap. No admin rights required except
     for the VC++ Redist step (which UAC-elevates itself silently via the
     manifest embedded in vc_redist.x64.exe).
+
+    Changes from v0.1.17:
+      - Fix `enabledPlugins` shape in settings.json. Claude Code 2.1.118+
+        rejects the array-of-objects form we'd been writing since v0.1.9
+        with "Expected record, but received array" and SKIPS THE ENTIRE
+        SETTINGS FILE on every launch (so paperwik never loads, the
+        scaffolder hook is unregistered, etc). Correct shape:
+            "enabledPlugins": { "<plugin>@<marketplace>": true }
+        For us: "paperwik@paperwik": true. Legacy array entries (from
+        prior Paperwik installs that wrote the wrong shape) are
+        discarded on re-run since they were invalid the whole time.
 
     Changes from v0.1.16:
       - Step 7 (Windows Terminal) now degrades gracefully instead of
@@ -953,18 +964,27 @@ $paperwikMarketplace = [PSCustomObject]@{
 }
 $settings.extraKnownMarketplaces | Add-Member -NotePropertyName 'paperwik' -NotePropertyValue $paperwikMarketplace -Force
 
-# enabledPlugins — filter out any stale paperwik entry, then append a fresh one
-$existingEnabled = @()
+# enabledPlugins is a record/object keyed by "<plugin>@<marketplace>" with
+# boolean values:
+#     "enabledPlugins": { "paperwik@paperwik": true }
+# Earlier Paperwik versions wrote it as an array of {name, marketplace}
+# objects, which Claude Code 2.1.118+ rejects with "Expected record, but
+# received array". If we find that legacy shape, we discard it - it was
+# invalid and Claude Code skipped the whole settings.json on every launch
+# while it was present, so there's no user state to preserve.
+$enabledMap = @{}
 if ($settings.PSObject.Properties['enabledPlugins'] -and $settings.enabledPlugins) {
-    $existingEnabled = @($settings.enabledPlugins | Where-Object {
-        $_ -and $_.PSObject.Properties['name'] -and $_.name -ne 'paperwik'
-    })
+    $existing = $settings.enabledPlugins
+    if ($existing -is [PSCustomObject]) {
+        # Carry forward any other plugins the user had enabled
+        foreach ($p in $existing.PSObject.Properties) {
+            $enabledMap[$p.Name] = $p.Value
+        }
+    }
+    # else: array (legacy/invalid) or scalar - discard
 }
-$existingEnabled += [PSCustomObject]@{
-    name        = 'paperwik'
-    marketplace = 'paperwik'
-}
-$settings | Add-Member -NotePropertyName 'enabledPlugins' -NotePropertyValue $existingEnabled -Force
+$enabledMap['paperwik@paperwik'] = $true
+$settings | Add-Member -NotePropertyName 'enabledPlugins' -NotePropertyValue $enabledMap -Force
 
 # Write without BOM so the Claude Code JSON parser doesn't choke
 try {
