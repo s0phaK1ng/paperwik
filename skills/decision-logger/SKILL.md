@@ -1,5 +1,5 @@
 ---
-name: decision-logger
+name: 👑 decision-logger
 description: >
   Capture user decisions into decisions.md automatically. Triggers when the
   user uses decision-making language like "let's go with X", "I've decided
