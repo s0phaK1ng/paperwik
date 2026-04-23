@@ -27,3 +27,7 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Scratch files used by maintainer commit/release flow
+.git-commit-msg.tmp
+.release-notes.tmp
