@@ -1,5 +1,5 @@
 ---
-name: 👑 lint-wiki
+name: lint-wiki
 description: >
   Periodic wiki health check. Triggers on phrases like "lint my wiki",
   "check the wiki for problems", "wiki health check", "find orphans",

@@ -1,5 +1,5 @@
 ---
-name: 👑 revert-state
+name: revert-state
 description: >
   Undo the last change. Triggers on phrases like "undo that", "undo the last
   change", "roll that back", "revert that", "put it back the way it was",

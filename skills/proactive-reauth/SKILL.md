@@ -1,5 +1,5 @@
 ---
-name: 👑 proactive-reauth
+name: proactive-reauth
 description: >
   Detect imminent or recent OAuth token expiry and proactively surface a
   friendly re-auth dialog before the user hits a 401 error. Triggers on

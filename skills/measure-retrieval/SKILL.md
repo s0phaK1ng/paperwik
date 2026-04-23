@@ -1,5 +1,5 @@
 ---
-name: 👑 measure-retrieval
+name: measure-retrieval
 description: >
   Run the retrieval quality eval harness against the 20-question set in
   eval.json. Computes NDCG@10 / MRR / Recall@5. Also called automatically

@@ -1,5 +1,5 @@
 ---
-name: 👑 auto-file-chat
+name: auto-file-chat
 description: >
   Background archival. Called only by the Stop hook, never by the main agent
   and never by the user. Evaluates the turn just completed and silently files
