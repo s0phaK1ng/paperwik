@@ -44,7 +44,7 @@ skill does exactly that.
 Tell them up front:
 
 > Rebuilding the retrieval index from your markdown files. This will:
-> - Re-read every `.md` file in your `Knowledge/` folder (~10–60 seconds
+> - Re-read every `.md` file in your `Paperwik/` folder (~10–60 seconds
 >   depending on size).
 > - Re-embed every chunk via fastembed (~5 minutes per 1000 chunks on CPU).
 > - Re-extract entities via the Claude API (~1 minute per 100 chunks,
@@ -59,7 +59,7 @@ Wait for yes.
 ### 2. Move the existing DB aside
 
 ```bash
-cd "%USERPROFILE%\Knowledge"
+cd "%USERPROFILE%\Paperwik"
 if exist knowledge.db move knowledge.db knowledge.db.bak-<timestamp>
 ```
 
@@ -69,7 +69,7 @@ user has a safety net.
 ### 3. Let the scaffolder recreate the empty schema
 
 ```bash
-del "%USERPROFILE%\Knowledge\.claude\.scaffolded"
+del "%USERPROFILE%\Paperwik\.claude\.scaffolded"
 uv run "${CLAUDE_PLUGIN_ROOT}/scripts/scaffold-vault.py"
 ```
 
@@ -79,7 +79,7 @@ fresh DB init.
 
 ### 4. Walk the vault, re-index each file
 
-Glob every `.md` file under `Knowledge/` except the special meta files
+Glob every `.md` file under `Paperwik/` except the special meta files
 (`CLAUDE.md`, `Welcome.md`, `index.md`, `log.md`, `decisions.md`). For
 each file, call the indexer:
 
@@ -103,7 +103,7 @@ import sys
 sys.path.insert(0, os.environ['CLAUDE_PLUGIN_ROOT'] + '/scripts')
 from embeddings import from_blob, mean_vector, to_blob
 
-db = Path(os.environ['USERPROFILE']) / 'Knowledge' / 'knowledge.db'
+db = Path(os.environ['USERPROFILE']) / 'Paperwik' / 'knowledge.db'
 conn = sqlite3.connect(str(db))
 for row in conn.execute('SELECT DISTINCT project FROM chunks').fetchall():
     project = row[0]
@@ -129,7 +129,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/scripts/search.py" "test query from rebuild" 3
 If the smoke test returns ≥1 result, delete the backup:
 
 ```bash
-del "%USERPROFILE%\Knowledge\knowledge.db.bak-<timestamp>"
+del "%USERPROFILE%\Paperwik\knowledge.db.bak-<timestamp>"
 ```
 
 If it returns zero results, restore the backup and tell the user the

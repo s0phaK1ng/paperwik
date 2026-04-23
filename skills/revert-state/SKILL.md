@@ -51,7 +51,7 @@ proceed. If they hedge, wait for clarity.
 Use the safe-git subset (PreToolUse governor allows this):
 
 ```bash
-cd "%USERPROFILE%\Knowledge"
+cd "%USERPROFILE%\Paperwik"
 git checkout HEAD~1 -- "<relative file path>"
 ```
 

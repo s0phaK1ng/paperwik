@@ -81,7 +81,7 @@ Query `projects` table in `knowledge.db`:
 ```bash
 uv run -c "
 import sqlite3, os, datetime
-conn = sqlite3.connect(os.path.expanduser('~/Knowledge/knowledge.db'))
+conn = sqlite3.connect(os.path.expanduser('~/Paperwik/knowledge.db'))
 cutoff = (datetime.datetime.utcnow() - datetime.timedelta(days=180)).isoformat()
 rows = conn.execute('SELECT name, last_activity_ts FROM projects WHERE archived=0 AND last_activity_ts < ?', (cutoff,)).fetchall()
 for r in rows:

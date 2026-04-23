@@ -322,7 +322,7 @@ def _create_project(conn: sqlite3.Connection, name: str, centroid: list[float]) 
 
     # Physically create the folder inside the vault
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    folder = user_profile / "Knowledge" / name
+    folder = user_profile / "Paperwik" / name
     folder.mkdir(parents=True, exist_ok=True)
 
     return int(cur.lastrowid)
@@ -431,7 +431,7 @@ ROUTING_SNIPPET_CHARS = 8000
 
 def _cmd_route(content_path: str) -> int:
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    db_path = user_profile / "Knowledge" / "knowledge.db"
+    db_path = user_profile / "Paperwik" / "knowledge.db"
     if not db_path.exists():
         print(f"knowledge.db not found at {db_path}", file=sys.stderr)
         return 1

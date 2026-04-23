@@ -1,0 +1,55 @@
+v0.1.16: Paperwik branding + Windows Terminal launcher + zero-touch UI
+
+The big "make this feel like an app for a non-technical 77yo" pass.
+
+Vault rename: ~/Knowledge -> ~/Paperwik
+  Product name and folder name now match. ~25 files touched (skills,
+  scripts, hooks, install.ps1, docs, templates). knowledge.db filename
+  unchanged - it's the type of thing, not branding.
+
+Template cleanup
+  Removed Starter Project (placeholder cruft from early scaffolding).
+  Added userIgnoreFilters to .obsidian/app.json so Obsidian hides
+  CLAUDE.md, index.md, log.md, knowledge.db, eval.json, .scaffolded
+  from the file explorer. End user sees only their actual content.
+
+NEW step 7: Windows Terminal install
+  WT becomes the polished launcher window for Paperwik. Win 11 22H2+
+  has it preinstalled; older Windows installs via winget. Falls back
+  to opening the Microsoft Store page if winget unavailable.
+
+Step 8 extended (was just plugin+vault; now also handles UI):
+  (a) git clone plugin (existing)
+  (b) merge ~/.claude/settings.json (existing)
+  (c) run scaffolder (existing)
+  (d) NEW: convert assets/paperwik-icon.png to ICO via System.Drawing
+      one-time per machine, cached at %LOCALAPPDATA%\Paperwik\
+  (e) NEW: add "Paperwik" profile + Catppuccin-Mocha color scheme to
+      Windows Terminal's settings.json. Profile auto-runs claude at
+      ~/Paperwik on launch, soft dark theme, 13pt Cascadia Code,
+      hidden scrollbar, generous padding.
+  (f) NEW: create Paperwik.lnk in BOTH the Start menu and on the
+      Desktop, both pointing at `wt.exe -p Paperwik` with the
+      Paperwik icon. One-click launch.
+  (g) NEW: register ~/Paperwik in %APPDATA%\obsidian\obsidian.json
+      with open=true. Obsidian opens directly into the vault on
+      first launch (no "create vault" dialog). Existing vaults
+      get open=false so Obsidian doesn't try to open multiple at
+      once.
+
+Asset bundle
+  Added assets/paperwik-icon.png (1000x1000 PNG with alpha) - the cyan
+  crown-in-a-Q logo. Used as the icon in the WT profile (PNG works
+  for WT) and converted to ICO for the .lnk shortcuts.
+
+Final-message rewrite
+  No more "open PowerShell, type cd ~, type claude". Now just:
+  "Click the Paperwik icon on your Desktop or in your Start menu."
+  Non-technical users never see PowerShell after install completes.
+
+Step labels tightened: step 3 no longer says "Paperwik runs in
+PowerShell" (misleading now that we have the WT launcher); step 8
+title summarizes what it actually does.
+
+Renumbered to 8 total steps. Banner says "Setting up in 8 steps.
+Expect 8-10 minutes on typical home internet."

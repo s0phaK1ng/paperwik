@@ -20,7 +20,7 @@
 $ErrorActionPreference = "Stop"
 
 try {
-    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Knowledge"
+    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
     $activePath = Join-Path -Path $vaultRoot -ChildPath ".claude\skills\state\active_context.md"
     $archivePath = Join-Path -Path $vaultRoot -ChildPath ".claude\skills\state\archived_index.md"
     $maxChars = 10000

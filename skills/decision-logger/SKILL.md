@@ -38,7 +38,7 @@ When triggered:
    *"Sounds like a decision — want me to log it?"*
 
 2. **If the user confirms** (yes / go / log it / sure):
-   - Look for `%USERPROFILE%\Knowledge\decisions.md`. If it doesn't exist,
+   - Look for `%USERPROFILE%\Paperwik\decisions.md`. If it doesn't exist,
      create it with a header block:
 
    ```markdown

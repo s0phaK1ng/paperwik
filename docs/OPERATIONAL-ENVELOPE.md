@@ -9,7 +9,7 @@ the end of the training session.
 ## What your helper is happy to do
 
 ### Keep everything in one folder
-- Your vault lives at `C:\Users\<you>\Knowledge\`.
+- Your vault lives at `C:\Users\<you>\Paperwik\`.
 - That folder is the helper's entire world. It reads and writes there,
   and only there.
 - If you ever ask it to touch something outside, you'll see a friendly
@@ -70,7 +70,7 @@ the end of the training session.
 ## What your helper won't do
 
 ### Touch the rest of your computer
-- Your helper can only reach files inside `C:\Users\<you>\Knowledge\`.
+- Your helper can only reach files inside `C:\Users\<you>\Paperwik\`.
   Not your Documents, not your Downloads, not Windows system files, not
   anything else.
 - Destructive Git commands (the kind that could wipe history) are
@@ -108,16 +108,16 @@ the end of the training session.
 
 | File / folder | What it's for |
 |---|---|
-| `Knowledge\` | Your entire vault |
-| `Knowledge\_Inbox\` | Drop zone for new sources |
-| `Knowledge\_Archive\` | Auto-archived inactive projects |
-| `Knowledge\<Project Name>\` | Topical folders your helper creates |
-| `Knowledge\index.md` | The full list of everything in your wiki |
-| `Knowledge\log.md` | Diary of what your helper has been up to |
-| `Knowledge\decisions.md` | Things you've decided (once logged) |
-| `Knowledge\knowledge.db` | The search index — leave this alone |
-| `Knowledge\eval.json` | Your 20 questions for weekly quality checks |
-| `Knowledge\.claude\` | Hidden config — leave this alone |
+| `Paperwik\` | Your entire vault |
+| `Paperwik\_Inbox\` | Drop zone for new sources |
+| `Paperwik\_Archive\` | Auto-archived inactive projects |
+| `Paperwik\<Project Name>\` | Topical folders your helper creates |
+| `Paperwik\index.md` | The full list of everything in your wiki |
+| `Paperwik\log.md` | Diary of what your helper has been up to |
+| `Paperwik\decisions.md` | Things you've decided (once logged) |
+| `Paperwik\knowledge.db` | The search index — leave this alone |
+| `Paperwik\eval.json` | Your 20 questions for weekly quality checks |
+| `Paperwik\.claude\` | Hidden config — leave this alone |
 | `Documents\Paperwik-Diagnostics.log` | Your helper's diary |
 | `Documents\Paperwik-Audit.log` | Redaction records (when you use them) |
 

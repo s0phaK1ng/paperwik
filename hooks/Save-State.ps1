@@ -30,7 +30,7 @@ try {
     $inputJson = [Console]::In.ReadToEnd()
     if ([string]::IsNullOrWhiteSpace($inputJson)) { exit 0 }
 
-    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Knowledge"
+    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
     $statePath = Join-Path -Path $vaultRoot -ChildPath ".claude\skills\state\active_context.md"
     $stateDir = Split-Path -Parent $statePath
     $timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"

@@ -54,7 +54,7 @@ Write something to disk if the turn includes any of:
    silently — do not create empty pages.
 3. For each candidate:
    - **Preference or decision** → append to
-     `%USERPROFILE%\Knowledge\.claude\skills\state\active_context.md` under
+     `%USERPROFILE%\Paperwik\.claude\skills\state\active_context.md` under
      the appropriate section with a timestamp.
    - **New entity** → create or update the entity page in the most recently
      active project folder. Use the project router briefly if ambiguous.

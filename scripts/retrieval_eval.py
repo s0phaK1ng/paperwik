@@ -213,7 +213,7 @@ def write_alert(drop: dict) -> None:
 
 def main() -> int:
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    vault = user_profile / "Knowledge"
+    vault = user_profile / "Paperwik"
     eval_path = vault / "eval.json"
     db_path = vault / "knowledge.db"
 

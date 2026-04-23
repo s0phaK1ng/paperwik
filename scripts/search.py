@@ -63,7 +63,7 @@ DEFAULT_CONFIG = {
 def _load_config() -> dict[str, Any]:
     """Load retrieval_config.json from the vault's .claude/ dir, falling back to defaults."""
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    cfg_path = user_profile / "Knowledge" / ".claude" / "retrieval_config.json"
+    cfg_path = user_profile / "Paperwik" / ".claude" / "retrieval_config.json"
     if not cfg_path.exists():
         return dict(DEFAULT_CONFIG)
     try:
@@ -405,7 +405,7 @@ def search(
 
     if db_path is None:
         user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-        db_path = user_profile / "Knowledge" / "knowledge.db"
+        db_path = user_profile / "Paperwik" / "knowledge.db"
 
     if not db_path.exists():
         return []

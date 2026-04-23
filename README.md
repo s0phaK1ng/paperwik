@@ -40,7 +40,7 @@ Read [the original gist](https://gist.github.com/karpathy/442a6bf555914893e9891c
 
 1. Run the one-line bootstrap: `irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex` — installs Claude Desktop (with Claude Code), Obsidian, and `uv`.
 2. Open Claude Code (inside Claude Desktop), run `/plugin marketplace add s0phak1ng/paperwik` + `/plugin install paperwik`.
-3. On first session, the scaffolding hook creates the vault at `%USERPROFILE%\Knowledge\` and downloads the retrieval models once (~3–5 min). After that, it's instant.
+3. On first session, the scaffolding hook creates the vault at `%USERPROFILE%\Paperwik\` and downloads the retrieval models once (~3–5 min). After that, it's instant.
 
 No custom installer to build. No Python environment management for the end user. One bundled binary (`git-filter-repo.exe`) for the redaction feature.
 

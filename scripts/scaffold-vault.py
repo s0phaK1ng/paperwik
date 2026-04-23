@@ -11,10 +11,10 @@ r"""
 scaffold-vault.py — First-run setup for Paperwik.
 
 Runs via `uv run` from the SessionStart hook. Idempotent: skips the body if
-the sentinel file %USERPROFILE%\Knowledge\.claude\.scaffolded already exists.
+the sentinel file %USERPROFILE%\Paperwik\.claude\.scaffolded already exists.
 
 Responsibilities:
-    1. Create the vault directory tree at %USERPROFILE%\Knowledge\ if missing
+    1. Create the vault directory tree at %USERPROFILE%\Paperwik\ if missing
     2. Copy template files from ${CLAUDE_PLUGIN_ROOT}/templates/vault/ into place
     3. Initialize knowledge.db with the full schema (chunks, graph_entities,
        entity_relationships, chunk_entities, projects)
@@ -44,7 +44,7 @@ from pathlib import Path
 def get_paths() -> dict[str, Path]:
     """Resolve the canonical Paperwik paths from env vars."""
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    vault_root = user_profile / "Knowledge"
+    vault_root = user_profile / "Paperwik"
     plugin_root_env = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if plugin_root_env:
         plugin_root = Path(plugin_root_env)

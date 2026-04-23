@@ -5,7 +5,7 @@ tags: [welcome, meta]
 
 # Welcome!
 
-This folder is your Knowledge vault — a quiet little corner of your
+This folder is your Paperwik vault — a quiet little corner of your
 computer where an AI helper is keeping your notes organized for you.
 
 Nothing here will ask you to be technical. If you can drop a file into a

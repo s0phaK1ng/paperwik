@@ -16,7 +16,7 @@ allowed-tools: Bash, Read, Glob, Grep
 # redact-history
 
 You are helping a non-technical user permanently remove content from their
-Obsidian vault. The vault is under `%USERPROFILE%\Knowledge\`. A PostToolUse
+Obsidian vault. The vault is under `%USERPROFILE%\Paperwik\`. A PostToolUse
 hook silently commits every file change to git, so plain deletion does NOT
 erase anything — the content remains in git history. This skill is the ONLY
 correct path for true erasure.
@@ -78,7 +78,7 @@ Escalate to a SECOND confirmation if:
 - Pattern resolves to a top-level directory
 
 Prompt: *"This is a large redaction (N files, M commits). To confirm, please
-type the exact name of this wiki: **`Knowledge`**"* — exact case-sensitive
+type the exact name of this wiki: **`Paperwik`**"* — exact case-sensitive
 match required.
 
 ### Step 4 — Execute

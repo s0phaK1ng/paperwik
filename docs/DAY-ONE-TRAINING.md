@@ -44,7 +44,7 @@ Paperwik plugin is installed, and the vault has been scaffolded.
 ### What the user sees at end of Phase 1
 
 - Obsidian in their taskbar.
-- `C:\Users\<them>\Knowledge\` exists with `_Inbox/`, `Starter Project/`,
+- `C:\Users\<them>\Paperwik\` exists with `_Inbox/`, `Starter Project/`,
   `_Archive/`, and several `.md` files visible in File Explorer.
 - Claude Code is running in a terminal window, showing a ready prompt.
 
@@ -75,7 +75,7 @@ Obsidian graph view filling in as it happens.
    files are no fun and your helper learns better from real sources."*
 2. Help them save it as `.md` if it's not already. Deep Research's "Share"
    menu has an export option.
-3. Drag the file into `C:\Users\<them>\Knowledge\_Inbox\`.
+3. Drag the file into `C:\Users\<them>\Paperwik\_Inbox\`.
 4. In Obsidian: point out the left sidebar showing the folder tree.
    Open the Graph View (Ctrl+G or click the graph icon).
 5. Back in the terminal: the user types `ingest the new source` and Enter.
@@ -156,7 +156,7 @@ later. We'll use them to keep an eye on whether your wiki is getting
 better or worse over time. Think of it as a little health check for
 your future self."**
 
-Write the questions into `Knowledge\eval.json` together. The format is
+Write the questions into `Paperwik\eval.json` together. The format is
 spelled out in the file's comment block. Don't worry about the
 `expected_chunks` field yet — that gets filled in after enough sources
 have been ingested to have real expected answers.

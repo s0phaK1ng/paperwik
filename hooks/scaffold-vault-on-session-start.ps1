@@ -19,7 +19,7 @@
 $ErrorActionPreference = "Stop"
 
 try {
-    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Knowledge"
+    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
     $sentinel = Join-Path -Path $vaultRoot -ChildPath ".claude\.scaffolded"
 
     # Fast-path skip (cheaper than spawning Python)
@@ -57,7 +57,7 @@ try {
     # Pass CLAUDE_PLUGIN_ROOT through to the Python process
     $env:CLAUDE_PLUGIN_ROOT = $pluginRoot
 
-    Write-Output "SYSTEM DIRECTIVE: First-time setup in progress (creating your Knowledge vault + initializing retrieval database). This runs once; subsequent launches are instant. When you see the scaffold-complete confirmation, greet the user with: 'Welcome — your knowledge vault is ready. Drop a source into the _Inbox folder when you want to start.'"
+    Write-Output "SYSTEM DIRECTIVE: First-time setup in progress (creating your Paperwik vault + initializing retrieval database). This runs once; subsequent launches are instant. When you see the scaffold-complete confirmation, greet the user with: 'Welcome — your knowledge vault is ready. Drop a source into the _Inbox folder when you want to start.'"
 
     & uv run $scaffolder
     $exitCode = $LASTEXITCODE

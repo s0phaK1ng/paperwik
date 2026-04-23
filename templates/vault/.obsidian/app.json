@@ -12,5 +12,16 @@
   "showInlineTitle": true,
   "showLineNumber": false,
   "showViewHeader": true,
-  "strictLineBreaks": false
+  "strictLineBreaks": false,
+  "userIgnoreFilters": [
+    "CLAUDE.md",
+    "index.md",
+    "log.md",
+    "eval.json",
+    "knowledge.db",
+    "knowledge.db-journal",
+    "knowledge.db-wal",
+    "knowledge.db-shm",
+    ".scaffolded"
+  ]
 }

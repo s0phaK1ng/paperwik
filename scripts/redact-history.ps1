@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-    Permanently redacts files from a Knowledge vault AND its git history.
+    Permanently redacts files from a Paperwik vault AND its git history.
 
 .DESCRIPTION
     Called by the redact-history skill after the agent has walked the user
     through the multi-step confirmation flow. Performs:
 
         1. Pattern sanitation  (block .. traversal, absolute paths, protected dirs)
-        2. Vault shape validation (must be under Knowledge/ with .git/ and .obsidian/)
+        2. Vault shape validation (must be under Paperwik/ with .git/ and .obsidian/)
         3. Enumerate matched files (dry-run support)
         4. Timestamped .git backup to %TEMP% (belt-and-braces before rewrite)
         5. git filter-repo --invert-paths --path <each matched> --force
@@ -39,7 +39,7 @@ $ErrorActionPreference = "Stop"
 #  Paths
 # --------------------------------------------------------------------------- #
 
-$VaultRoot = Join-Path $env:USERPROFILE "Knowledge"
+$VaultRoot = Join-Path $env:USERPROFILE "Paperwik"
 $PluginRoot = $env:CLAUDE_PLUGIN_ROOT
 if ([string]::IsNullOrWhiteSpace($PluginRoot)) {
     $PluginRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
@@ -225,7 +225,7 @@ try {
             status = "dryrun_ok"
             target = $TargetPattern
             vault = $VaultRoot
-            wiki_name = "Knowledge"
+            wiki_name = "Paperwik"
             matched_files = $matched.Count
             matched_list = ($matched -join ';')
             commits_to_rewrite = $commitsToRewrite
@@ -285,7 +285,7 @@ try {
         file_count_purged = $matched.Count
         commit_count_rewritten = $commitsToRewrite
         requester_confirmation_phrase = $ConfirmationToken
-        wiki_name = "Knowledge"
+        wiki_name = "Paperwik"
     } | ConvertTo-Json -Compress
     Add-Content -Path $TombstonePath -Value $tombstoneLine
 
@@ -298,7 +298,7 @@ try {
         $sha256.Dispose()
     }
     $confEsc = $ConfirmationToken -replace '"', '\"'
-    $auditLine = "timestamp=$Timestamp audit_id=$AuditId vault=`"$VaultRoot`" wiki=`"Knowledge`" target=`"$TargetPattern`" tool=git-filter-repo files_count=$($matched.Count) files=`"$($matched -join '|')`" commits_rewritten=$commitsToRewrite shas_before_hash=$shaBefore shas_after_hash=$shaAfter confirmation=`"$confEsc`" backup=`"$backupZip`" success=true error=`"`""
+    $auditLine = "timestamp=$Timestamp audit_id=$AuditId vault=`"$VaultRoot`" wiki=`"Paperwik`" target=`"$TargetPattern`" tool=git-filter-repo files_count=$($matched.Count) files=`"$($matched -join '|')`" commits_rewritten=$commitsToRewrite shas_before_hash=$shaBefore shas_after_hash=$shaAfter confirmation=`"$confEsc`" backup=`"$backupZip`" success=true error=`"`""
     Add-Content -Path $AuditLog -Value $auditLine
 
     # 12. Success
@@ -306,7 +306,7 @@ try {
         status = "ok"
         target = $TargetPattern
         vault = $VaultRoot
-        wiki_name = "Knowledge"
+        wiki_name = "Paperwik"
         files_purged = $matched.Count
         commits_rewritten = $commitsToRewrite
         tombstone_path = $TombstonePath

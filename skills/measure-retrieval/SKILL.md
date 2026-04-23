@@ -27,7 +27,7 @@ Run the retrieval eval harness and report metrics.
 ```bash
 uv run python -c "
 import json, pathlib, os
-p = pathlib.Path(os.environ['USERPROFILE']) / 'Knowledge' / 'eval.json'
+p = pathlib.Path(os.environ['USERPROFILE']) / 'Paperwik' / 'eval.json'
 data = json.loads(p.read_text(encoding='utf-8'))
 print(f\"questions: {len(data.get('questions', []))}\")"
 ```

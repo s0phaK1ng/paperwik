@@ -11,7 +11,7 @@
         4. Install Obsidian (winget preferred, direct download as fallback)
         5. Install Microsoft Visual C++ 2015-2022 Redistributable (x64)
         6. Install uv (Python runner used by Paperwik's retrieval scripts)
-        7. Install and pre-register the Paperwik plugin, build the Knowledge
+        7. Install and pre-register the Paperwik plugin, build the Paperwik
            vault, so the user's first `claude` launch has everything ready —
            no manual /plugin marketplace add or /plugin install required.
 
@@ -19,7 +19,7 @@
     plugin repo to ~/.claude/plugins/marketplaces/paperwik/ and registering
     it in extraKnownMarketplaces + enabledPlugins, we eliminate the need for
     the user to type any slash commands. The scaffolder runs at install time
-    (we already have uv + plugin repo on disk) so ~/Knowledge/ exists before
+    (we already have uv + plugin repo on disk) so ~/Paperwik/ exists before
     Claude Code is even opened.
 
     NOTE: Paperwik runs in the Claude Code CLI (terminal, launched by typing
@@ -28,9 +28,41 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.1.12 — friends-and-family bootstrap. No admin rights required except
+    v0.1.16 — friends-and-family bootstrap. No admin rights required except
     for the VC++ Redist step (which UAC-elevates itself silently via the
     manifest embedded in vc_redist.x64.exe).
+
+    Changes from v0.1.15:
+      - Renamed the vault folder from ~/Knowledge to ~/Paperwik so the
+        product name and the folder name match. (knowledge.db filename
+        unchanged - it's a generic type, not branding.) ~25 files touched.
+      - Removed Starter Project from the template tree (placeholder cruft).
+      - Added userIgnoreFilters to .obsidian/app.json so Obsidian hides
+        CLAUDE.md, index.md, log.md, knowledge.db, etc. - end user only
+        sees their actual content pages.
+      - NEW Step 7: install Windows Terminal. Already preinstalled on
+        Win 11 22H2+; for older Windows we install via winget with a Store
+        link as fallback. WT is the polished launcher window we use to
+        make the terminal experience feel like an app.
+      - Step 8 (Paperwik) extended with three new sub-actions:
+          * Convert plugin's bundled assets/paperwik-icon.png into
+            paperwik-icon.ico via System.Drawing (one-time per machine,
+            cached at %LOCALAPPDATA%\Paperwik\paperwik-icon.ico)
+          * Add a "Paperwik" profile + Catppuccin-style color scheme to
+            Windows Terminal's settings.json. Profile auto-runs claude
+            at ~/Paperwik on launch, soft dark theme, 13pt Cascadia Code,
+            clean padding, hidden scrollbar.
+          * Create Paperwik shortcuts in BOTH the Start menu and on the
+            Desktop. Each launches `wt.exe -p Paperwik` so one click
+            opens the themed window with claude already running. Custom
+            icon if PNG-to-ICO conversion succeeded; falls back to
+            Claude Desktop's icon otherwise.
+          * Register ~/Paperwik in %APPDATA%\obsidian\obsidian.json with
+            open=true so Obsidian opens directly into the vault on first
+            launch (no "create vault" / "open folder as vault" dialog).
+      - Renumbered to 8 total steps. Final-message rewritten - now just:
+        "Click the Paperwik icon on your desktop". No more cd-and-claude
+        instructions. Non-technical users never see PowerShell after install.
 
     Changes from v0.1.11:
       - Apply the same native-command-stderr fix to the `uv run scaffolder`
@@ -38,9 +70,9 @@
         ("Downloading cpython-3.14... (21.3MiB)") to stderr, which with
         ErrorActionPreference=Stop PS treated as a terminating error and
         killed the child process mid-download - scaffolder never completed,
-        no Knowledge folder. Fix: locally relax ErrorActionPreference to
+        no Paperwik folder. Fix: locally relax ErrorActionPreference to
         Continue around the uv call, check $LASTEXITCODE, and additionally
-        use filesystem truth (~/Knowledge/.claude/.scaffolded sentinel) as
+        use filesystem truth (~/Paperwik/.claude/.scaffolded sentinel) as
         the authoritative success signal.
       - Show a clear manual-retry command in the output if the scaffolder
         call still hits a real failure, so the user can recover without
@@ -92,7 +124,7 @@
               ~/.claude/settings.json (preserves any other user settings via
               PSCustomObject round-trip)
           (c) run scripts/scaffold-vault.py directly via uv to create
-              ~/Knowledge/ with full vault template + knowledge.db schema
+              ~/Paperwik/ with full vault template + knowledge.db schema
         User's first `claude` launch sees the plugin pre-enabled and the
         vault already present — no /plugin commands, no waiting for the
         SessionStart hook to build the vault.
@@ -201,7 +233,7 @@ try {
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host "  Hello! Welcome to Paperwik." -ForegroundColor Cyan
-Write-Host "  Setting up in 7 steps. Expect 8-10 minutes on typical home internet." -ForegroundColor Cyan
+Write-Host "  Setting up in 8 steps. Expect 8-10 minutes on typical home internet." -ForegroundColor Cyan
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -281,7 +313,7 @@ function Get-LatestClaudeDesktopUrl {
 # -----------------------------------------------------------------------------
 # Step 1 — Git for Windows (provides git + git-bash; Claude Code requires bash)
 # -----------------------------------------------------------------------------
-Write-Host "[1/7] Setting up Git for Windows (Claude Code needs git-bash)..." -ForegroundColor Yellow
+Write-Host "[1/8] Setting up Git for Windows (Claude Code needs git-bash)..." -ForegroundColor Yellow
 
 if (Test-CommandExists "git") {
     Write-Host "      Already on your computer, moving on." -ForegroundColor Green
@@ -342,7 +374,7 @@ foreach ($candidate in $bashCandidates) {
 # Step 2 — Claude Code
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/7] Setting up Claude Code (the engine that powers Paperwik)..." -ForegroundColor Yellow
+Write-Host "[2/8] Setting up Claude Code (the engine that powers Paperwik)..." -ForegroundColor Yellow
 
 # The Anthropic installer drops claude.exe into ~/.local/bin and, if that
 # folder isn't in PATH, prints a scary "Add it by opening System Properties
@@ -382,7 +414,7 @@ if (Test-CommandExists "claude") {
 # Step 3 — Claude Desktop (GUI app for general chat; not the Paperwik entry point)
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[3/7] Setting up Claude Desktop (great for general chat; Paperwik runs in PowerShell)..." -ForegroundColor Yellow
+Write-Host "[3/8] Setting up Claude Desktop (general chat app; Paperwik runs separately)..." -ForegroundColor Yellow
 
 # Claude Desktop is a Squirrel/Electron app. Per-user install by default lands
 # the launcher stub at %LOCALAPPDATA%\AnthropicClaude\Claude.exe (this is what
@@ -475,7 +507,7 @@ if (Test-ClaudeDesktopInstalled) {
 # Step 4 — Obsidian
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[4/7] Setting up Obsidian (where you'll read your notes)..." -ForegroundColor Yellow
+Write-Host "[4/8] Setting up Obsidian (where you'll read your notes)..." -ForegroundColor Yellow
 
 $obsidianCandidates = @(
     (Join-Path $env:LOCALAPPDATA "Programs\Obsidian\Obsidian.exe"),  # electron-builder default (per-user)
@@ -617,7 +649,7 @@ if ($obsidianInstalled) {
 # failures during the first ingest. Install unconditionally - the Microsoft
 # installer is idempotent and exits quickly if already present.
 Write-Host ""
-Write-Host "[5/7] Setting up Visual C++ Redistributable (needed by the search engine)..." -ForegroundColor Yellow
+Write-Host "[5/8] Setting up Visual C++ Redistributable (needed by the search engine)..." -ForegroundColor Yellow
 
 function Test-VCRedistInstalled {
     (Test-Path "$env:WINDIR\System32\vcruntime140.dll") -and (Test-Path "$env:WINDIR\System32\msvcp140.dll")
@@ -673,7 +705,7 @@ if (Test-VCRedistInstalled) {
 # Step 6 — uv (Python runner used by Paperwik's retrieval scripts)
 # -----------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[6/7] Setting up uv (a helper that runs Paperwik's search tools)..." -ForegroundColor Yellow
+Write-Host "[6/8] Setting up uv (a helper that runs Paperwik's search tools)..." -ForegroundColor Yellow
 
 $uvExe = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
 
@@ -738,21 +770,86 @@ if (Test-UvAvailable) {
 }
 
 # -----------------------------------------------------------------------------
-# Step 7 — Register + enable the Paperwik plugin + build the Knowledge vault
+# Step 7 — Windows Terminal (the polished launcher window for Paperwik)
 # -----------------------------------------------------------------------------
-# Claude Code reads ~/.claude/settings.json on startup. If it sees a marketplace
-# registered in `extraKnownMarketplaces` and a plugin enabled in `enabledPlugins`
-# pointing at that marketplace, it loads the plugin on session start without
-# the user having to type /plugin marketplace add or /plugin install.
-#
-# To avoid a first-launch network hit we also clone the plugin repo directly
-# into the cache location Claude Code expects
-# (~/.claude/plugins/marketplaces/paperwik/). And while we have the plugin on
-# disk we run the scaffolder ourselves so ~/Knowledge/ exists BEFORE the user
-# ever opens Claude Code — no waiting for a SessionStart hook to build the
-# vault, no "where do I point Obsidian" confusion.
+# We give the end user a Start-menu shortcut "Paperwik" that opens Windows
+# Terminal with a custom profile (themed colors, large readable font, no tab
+# bar clutter, auto-runs claude at ~/Paperwik). For an older non-technical
+# user, this turns the terminal experience into something that visually
+# reads as "an app". Windows 11 22H2+ ships WT preinstalled; older Win 11
+# and Win 10 need a winget install.
 Write-Host ""
-Write-Host "[7/7] Installing Paperwik and building your Knowledge vault..." -ForegroundColor Yellow
+Write-Host "[7/8] Setting up Windows Terminal (the friendly launcher window)..." -ForegroundColor Yellow
+
+function Test-WindowsTerminalInstalled {
+    # wt.exe lives behind a Windows App Execution Alias on installs;
+    # check the alias path AND the modern AppX package name.
+    $aliasPath = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\wt.exe"
+    if (Test-Path $aliasPath) { return $true }
+    try {
+        $appx = Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -like '*WindowsTerminal*'
+        } | Select-Object -First 1
+        if ($appx) { return $true }
+    } catch { }
+    return $false
+}
+
+if (Test-WindowsTerminalInstalled) {
+    Write-Host "      Already on your computer, perfect." -ForegroundColor Green
+} else {
+    $installed = $false
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($winget) {
+        try {
+            winget install --id Microsoft.WindowsTerminal -e --silent --accept-package-agreements --accept-source-agreements
+            Start-Sleep -Seconds 3
+            if (Test-WindowsTerminalInstalled) {
+                $installed = $true
+                Write-Host "      Windows Terminal ready (via winget)." -ForegroundColor Green
+            }
+        } catch {
+            Write-Host "      winget install didn't complete cleanly: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+    if (-not $installed) {
+        # Fallback: open the Microsoft Store page so the user can install
+        # manually. Windows Terminal has no clean unattended .msi/.exe path
+        # outside winget — the MSIX bundle from GitHub Releases requires
+        # specific Windows feature support that varies by build.
+        Write-Host "      Couldn't auto-install. Opening the Microsoft Store page so you can install it..." -ForegroundColor Yellow
+        Start-Process "ms-windows-store://pdp/?productid=9N0DX20HK701"
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show(
+            "Microsoft Store just opened to the Windows Terminal page.`n`nClick 'Get' / 'Install', wait for it to finish, then re-run this bootstrap - it'll pick up where we left off.",
+            "Windows Terminal - manual install",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        ) | Out-Null
+        exit 1
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Step 8 — Paperwik plugin + vault + WT profile + Start menu shortcut +
+#          Obsidian vault registration (the "everything ready to use" step)
+# -----------------------------------------------------------------------------
+# Six related actions, all so the user's first launch is fully functional:
+#
+#   (a) git clone the plugin repo to ~/.claude/plugins/marketplaces/paperwik/
+#   (b) merge extraKnownMarketplaces + enabledPlugins into ~/.claude/settings.json
+#       so Claude Code auto-loads the plugin without /plugin commands
+#   (c) run scripts/scaffold-vault.py to create ~/Paperwik/ with the full
+#       template tree + knowledge.db schema initialized
+#   (d) add a "Paperwik" profile + color scheme to Windows Terminal's
+#       settings.json so we can launch into a themed window
+#   (e) create a Start-menu shortcut "Paperwik" -> wt.exe -p Paperwik so
+#       the user clicks one icon, terminal opens, claude is already running
+#   (f) register ~/Paperwik in %APPDATA%\obsidian\obsidian.json so Obsidian
+#       opens directly into the vault on first launch (no "create vault"
+#       dialog confusion)
+Write-Host ""
+Write-Host "[8/8] Setting up Paperwik (vault, plugin, app icon, Obsidian)..." -ForegroundColor Yellow
 
 $claudeDir = Join-Path $env:USERPROFILE ".claude"
 $settingsPath = Join-Path $claudeDir "settings.json"
@@ -863,14 +960,14 @@ try {
     Write-Host "      Failed to write settings.json: $($_.Exception.Message)" -ForegroundColor Red
 }
 
-# --- (c) Run the scaffolder to build ~/Knowledge now -------------------------
+# --- (c) Run the scaffolder to build ~/Paperwik now -------------------------
 # Same native-command-stderr trap as git: uv prints download progress
 # ("Downloading cpython-3.14... (21.3MiB)") to stderr, which with
 # ErrorActionPreference="Stop" looks like a terminating error to PS and kills
 # the child process mid-download. Relax ErrorActionPreference locally and use
 # $LASTEXITCODE + filesystem verification as the success signal.
 $scaffolder = Join-Path $paperwikDir "scripts\scaffold-vault.py"
-$vaultRoot = Join-Path $env:USERPROFILE "Knowledge"
+$vaultRoot = Join-Path $env:USERPROFILE "Paperwik"
 $sentinel = Join-Path $vaultRoot ".claude\.scaffolded"
 if (Test-Path $scaffolder) {
     $env:CLAUDE_PLUGIN_ROOT = $paperwikDir
@@ -879,7 +976,7 @@ if (Test-Path $scaffolder) {
     if ((Test-Path $uvBinDir) -and (($env:PATH -split ';') -notcontains $uvBinDir)) {
         $env:PATH = "$env:PATH;$uvBinDir"
     }
-    Write-Host "      Building your Knowledge vault (first run takes ~30-60 seconds while uv fetches Python)..." -ForegroundColor Yellow
+    Write-Host "      Building your Paperwik vault (first run takes ~30-60 seconds while uv fetches Python)..." -ForegroundColor Yellow
     $prevErrActPref = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -895,7 +992,7 @@ if (Test-Path $scaffolder) {
     # Filesystem-based truth: if the sentinel exists, the scaffolder completed
     # regardless of what uv's exit code said.
     if (Test-Path $sentinel) {
-        Write-Host "      Knowledge vault ready at $vaultRoot." -ForegroundColor Green
+        Write-Host "      Paperwik vault ready at $vaultRoot." -ForegroundColor Green
     } elseif ($uvExit -eq 0) {
         Write-Host "      uv reported success but sentinel is missing. Run again or launch Claude Code to retry." -ForegroundColor Yellow
     } else {
@@ -908,39 +1005,263 @@ if (Test-Path $scaffolder) {
     Write-Host "      Scaffolder script not found (plugin clone may have failed). Launching Claude Code will try again." -ForegroundColor Yellow
 }
 
+# --- (d) Convert PNG icon to ICO + (e) shortcuts + (f) Obsidian vault registration --
+
+# Resolve icon paths. PNG ships in the plugin repo at assets/paperwik-icon.png.
+# We convert to ICO at install time (one-time per machine) because Windows
+# .lnk shortcuts want ICO format for clean rendering at multiple sizes.
+$iconPng = Join-Path $paperwikDir "assets\paperwik-icon.png"
+$iconCacheDir = Join-Path $env:LOCALAPPDATA "Paperwik"
+$iconIco = Join-Path $iconCacheDir "paperwik-icon.ico"
+
+if (Test-Path $iconPng) {
+    if (-not (Test-Path $iconCacheDir)) {
+        New-Item -ItemType Directory -Path $iconCacheDir -Force | Out-Null
+    }
+    if (-not (Test-Path $iconIco)) {
+        try {
+            Add-Type -AssemblyName System.Drawing
+            $bmp = New-Object System.Drawing.Bitmap $iconPng
+            $iconHandle = $bmp.GetHicon()
+            $icon = [System.Drawing.Icon]::FromHandle($iconHandle)
+            $fs = [System.IO.File]::Open($iconIco, [System.IO.FileMode]::Create)
+            $icon.Save($fs)
+            $fs.Close()
+            $icon.Dispose()
+            $bmp.Dispose()
+            Write-Host "      Generated Paperwik icon at $iconIco." -ForegroundColor DarkGray
+        } catch {
+            Write-Host "      Icon conversion failed ($($_.Exception.Message)); shortcuts will use Claude Desktop icon." -ForegroundColor Yellow
+            $iconIco = $null
+        }
+    }
+} else {
+    Write-Host "      Note: paperwik-icon.png not found in plugin assets/; shortcuts will use Claude Desktop icon." -ForegroundColor DarkGray
+    $iconIco = $null
+}
+
+# --- Add Paperwik profile + scheme to Windows Terminal settings.json -----
+# The Windows Terminal app stores its config at this path on Windows 10/11
+# (packaged install via Store/winget). Profile + scheme merged
+# non-destructively so any existing user profiles are preserved.
+$wtSettingsPath = Join-Path $env:LOCALAPPDATA "Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
+$paperwikProfileGuid = "{8a4f2c91-e7b3-4c5d-9f8a-3b2e6d1c5f7a}"  # stable, hardcoded so re-runs find+update
+
+# Profile that auto-cd's to ~/Paperwik and runs claude. -NoExit keeps the
+# window open if claude exits (so the user sees any error message instead
+# of a window that vanishes silently).
+$paperwikCmd = 'powershell.exe -NoLogo -NoProfile -NoExit -Command "& { Set-Location $env:USERPROFILE\Paperwik; claude }"'
+$paperwikIconForWt = if ($iconPng -and (Test-Path $iconPng)) { $iconPng } else { "$env:LOCALAPPDATA\AnthropicClaude\Claude.exe" }
+
+# Soft dark color scheme (Catppuccin Mocha style) — easier on older eyes
+# than the stock high-contrast WT defaults.
+$paperwikScheme = [PSCustomObject]@{
+    name                = "Paperwik"
+    background          = "#1e1e2e"
+    foreground          = "#cdd6f4"
+    cursorColor         = "#f5c2e7"
+    selectionBackground = "#585b70"
+    black               = "#45475a"
+    red                 = "#f38ba8"
+    green               = "#a6e3a1"
+    yellow              = "#f9e2af"
+    blue                = "#89b4fa"
+    purple              = "#f5c2e7"
+    cyan                = "#94e2d5"
+    white               = "#bac2de"
+    brightBlack         = "#585b70"
+    brightRed           = "#f38ba8"
+    brightGreen         = "#a6e3a1"
+    brightYellow        = "#f9e2af"
+    brightBlue          = "#89b4fa"
+    brightPurple        = "#f5c2e7"
+    brightCyan          = "#94e2d5"
+    brightWhite         = "#a6adc8"
+}
+
+$paperwikProfile = [PSCustomObject]@{
+    guid              = $paperwikProfileGuid
+    name              = "Paperwik"
+    commandline       = $paperwikCmd
+    startingDirectory = "%USERPROFILE%\Paperwik"
+    tabTitle          = "Paperwik"
+    icon              = $paperwikIconForWt
+    useAcrylic        = $false
+    font              = [PSCustomObject]@{ face = "Cascadia Code"; size = 13 }
+    colorScheme       = "Paperwik"
+    cursorShape       = "filledBox"
+    padding           = "16, 12"
+    scrollbarState    = "hidden"
+    antialiasingMode  = "cleartype"
+}
+
+# Read existing WT settings (or empty)
+$wtSettings = [PSCustomObject]@{}
+if (Test-Path $wtSettingsPath) {
+    try {
+        $raw = Get-Content $wtSettingsPath -Raw -ErrorAction SilentlyContinue
+        if ($raw -and $raw.Trim()) {
+            $parsed = $raw | ConvertFrom-Json -ErrorAction Stop
+            if ($parsed -is [PSCustomObject]) { $wtSettings = $parsed }
+        }
+    } catch {
+        Write-Host "      Existing WT settings.json wasn't valid JSON; replacing." -ForegroundColor Yellow
+    }
+} else {
+    $wtDir = Split-Path -Parent $wtSettingsPath
+    if (-not (Test-Path $wtDir)) {
+        New-Item -ItemType Directory -Path $wtDir -Force | Out-Null
+    }
+}
+
+# Ensure profiles.list exists
+if (-not $wtSettings.PSObject.Properties['profiles']) {
+    $wtSettings | Add-Member -NotePropertyName 'profiles' -NotePropertyValue ([PSCustomObject]@{ list = @() }) -Force
+}
+if (-not $wtSettings.profiles.PSObject.Properties['list']) {
+    $wtSettings.profiles | Add-Member -NotePropertyName 'list' -NotePropertyValue @() -Force
+}
+
+# Filter out any prior Paperwik profile (by GUID), then append fresh one
+$existingProfiles = @()
+if ($wtSettings.profiles.list) {
+    $existingProfiles = @($wtSettings.profiles.list | Where-Object {
+        -not ($_.PSObject.Properties['guid'] -and $_.guid -eq $paperwikProfileGuid)
+    })
+}
+$existingProfiles += $paperwikProfile
+$wtSettings.profiles.list = $existingProfiles
+
+# Same for schemes
+if (-not $wtSettings.PSObject.Properties['schemes']) {
+    $wtSettings | Add-Member -NotePropertyName 'schemes' -NotePropertyValue @() -Force
+}
+$existingSchemes = @()
+if ($wtSettings.schemes) {
+    $existingSchemes = @($wtSettings.schemes | Where-Object {
+        -not ($_.PSObject.Properties['name'] -and $_.name -eq 'Paperwik')
+    })
+}
+$existingSchemes += $paperwikScheme
+$wtSettings.schemes = $existingSchemes
+
+# Write WT settings as UTF-8 without BOM
+try {
+    $json = $wtSettings | ConvertTo-Json -Depth 12
+    [System.IO.File]::WriteAllText($wtSettingsPath, $json, (New-Object System.Text.UTF8Encoding $false))
+    Write-Host "      Added 'Paperwik' profile to Windows Terminal." -ForegroundColor DarkGray
+} catch {
+    Write-Host "      Couldn't write WT settings.json: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+# --- Create Start menu + Desktop shortcuts -----------------------------------
+$wtExe = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\wt.exe"
+$wshShell = New-Object -ComObject WScript.Shell
+$shortcutTargets = @(
+    @{ Path = (Join-Path ([Environment]::GetFolderPath('Programs')) 'Paperwik.lnk'); Where = 'Start menu' },
+    @{ Path = (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Paperwik.lnk'); Where = 'Desktop' }
+)
+$shortcutIcon = if ($iconIco -and (Test-Path $iconIco)) { "$iconIco,0" } else { "$env:LOCALAPPDATA\AnthropicClaude\Claude.exe,0" }
+
+foreach ($target in $shortcutTargets) {
+    try {
+        $sc = $wshShell.CreateShortcut($target.Path)
+        $sc.TargetPath = $wtExe
+        $sc.Arguments = "-p Paperwik"
+        $sc.WorkingDirectory = (Join-Path $env:USERPROFILE 'Paperwik')
+        $sc.IconLocation = $shortcutIcon
+        $sc.Description = "Paperwik - your personal knowledge wiki"
+        $sc.Save()
+        Write-Host "      Created Paperwik shortcut on $($target.Where)." -ForegroundColor DarkGray
+    } catch {
+        Write-Host "      Failed to create $($target.Where) shortcut: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+# --- Register vault in Obsidian's vault list ---------------------------------
+# Obsidian stores its known vaults at %APPDATA%\obsidian\obsidian.json. Each
+# entry is keyed by an arbitrary 16-char hex ID. Setting `open: true` makes
+# Obsidian launch directly into that vault. We use a stable ID so re-runs
+# update the same entry instead of stacking duplicates.
+$obsidianJsonPath = Join-Path $env:APPDATA "obsidian\obsidian.json"
+$paperwikVaultId = "paperwikvault01"  # stable, paperwik-specific
+$paperwikVaultPath = Join-Path $env:USERPROFILE "Paperwik"
+
+$obsidianJson = [PSCustomObject]@{}
+if (Test-Path $obsidianJsonPath) {
+    try {
+        $raw = Get-Content $obsidianJsonPath -Raw -ErrorAction SilentlyContinue
+        if ($raw -and $raw.Trim()) {
+            $parsed = $raw | ConvertFrom-Json -ErrorAction Stop
+            if ($parsed -is [PSCustomObject]) { $obsidianJson = $parsed }
+        }
+    } catch {
+        Write-Host "      Existing obsidian.json wasn't valid JSON; replacing." -ForegroundColor Yellow
+    }
+} else {
+    $obsidianDir = Split-Path -Parent $obsidianJsonPath
+    if (-not (Test-Path $obsidianDir)) {
+        New-Item -ItemType Directory -Path $obsidianDir -Force | Out-Null
+    }
+}
+
+# Ensure vaults object exists
+if (-not $obsidianJson.PSObject.Properties['vaults']) {
+    $obsidianJson | Add-Member -NotePropertyName 'vaults' -NotePropertyValue ([PSCustomObject]@{}) -Force
+}
+
+# Mark all existing vaults as not-open (so Obsidian doesn't try to open
+# multiple at once), then add/update Paperwik with open=true.
+foreach ($prop in @($obsidianJson.vaults.PSObject.Properties)) {
+    $v = $prop.Value
+    if ($v -and $v.PSObject.Properties['open']) {
+        $v.open = $false
+    }
+}
+
+$paperwikVaultEntry = [PSCustomObject]@{
+    path = $paperwikVaultPath
+    ts   = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    open = $true
+}
+$obsidianJson.vaults | Add-Member -NotePropertyName $paperwikVaultId -NotePropertyValue $paperwikVaultEntry -Force
+
+try {
+    $json = $obsidianJson | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($obsidianJsonPath, $json, (New-Object System.Text.UTF8Encoding $false))
+    Write-Host "      Registered Paperwik vault in Obsidian (will open automatically)." -ForegroundColor DarkGray
+} catch {
+    Write-Host "      Couldn't write obsidian.json: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
 # -----------------------------------------------------------------------------
 # Finish — tell user what comes next
 # -----------------------------------------------------------------------------
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Green
-Write-Host "  Nice! The setup is done." -ForegroundColor Green
+Write-Host "  Nice! Paperwik is ready to use." -ForegroundColor Green
 Write-Host "===============================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Everything is installed, registered, and your vault is built." -ForegroundColor Cyan
-Write-Host "Here's how to start using it:" -ForegroundColor Cyan
+Write-Host "Everything is installed and configured. To start:" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  1. Close this PowerShell window."
+Write-Host "  1. Close this window." -ForegroundColor White
 Write-Host ""
-Write-Host "  2. Open Obsidian." -ForegroundColor White
-Write-Host "     Pick 'Open folder as vault' and point it at:"
-Write-Host "        C:\Users\$env:USERNAME\Knowledge" -ForegroundColor Yellow
-Write-Host "     That's your wiki. Browse it, read the Welcome page."
+Write-Host "  2. Look for the Paperwik icon — on your Desktop, or in your" -ForegroundColor White
+Write-Host "     Start menu (press Win, type 'Paperwik', hit Enter)."
 Write-Host ""
-Write-Host "  3. Open PowerShell (press Win, type 'powershell', hit Enter)." -ForegroundColor White
-Write-Host "     Then type:"
-Write-Host "        cd ~" -ForegroundColor Yellow
-Write-Host "        claude" -ForegroundColor Yellow
-Write-Host "     First time, Claude opens a browser to sign you in. Click Approve."
+Write-Host "  3. Click it. A window opens, you're already signed in if you've" -ForegroundColor White
+Write-Host "     used Claude before. (First time only: a browser tab opens to"
+Write-Host "     sign in to Claude Pro/Max — click Approve, come back.)"
 Write-Host ""
-Write-Host "  4. Try something." -ForegroundColor White
-Write-Host "     Drop a PDF or markdown file into:"
-Write-Host "        C:\Users\$env:USERNAME\Knowledge\_Inbox" -ForegroundColor Yellow
-Write-Host "     Then at the Claude prompt, say:"
-Write-Host "        ingest the new source" -ForegroundColor Yellow
-Write-Host "     Or paste a URL:"
-Write-Host "        ingest https://example.com/some-article" -ForegroundColor Yellow
+Write-Host "  4. Type what you want, like:" -ForegroundColor White
+Write-Host "        ingest https://example.com/an-article-i-want-saved" -ForegroundColor Yellow
+Write-Host "        what do I know about <a topic>?" -ForegroundColor Yellow
+Write-Host "        summarize the last few sources I added" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  Any question? Just ask Claude naturally: 'what do I know about X?'"
+Write-Host "  5. To browse your wiki visually, open Obsidian. Your vault is" -ForegroundColor White
+Write-Host "     already opened — just click Obsidian in your Start menu."
+Write-Host ""
+Write-Host "===============================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Green
 Write-Host ""

@@ -234,13 +234,13 @@ def chunk_text(text: str, target_size: int = TARGET_CHUNK_CHARS) -> list[str]:
 
 def _get_db_path() -> Path:
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    return user_profile / "Knowledge" / "knowledge.db"
+    return user_profile / "Paperwik" / "knowledge.db"
 
 
 def _to_vault_relative(source_path: Path) -> str:
     """Return file_path relative to the vault root for the sources table."""
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
-    vault_root = user_profile / "Knowledge"
+    vault_root = user_profile / "Paperwik"
     try:
         rel = source_path.resolve().relative_to(vault_root.resolve())
         return str(rel).replace("\\", "/")

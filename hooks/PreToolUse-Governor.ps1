@@ -6,7 +6,7 @@
     Intercepts every tool call before execution. Enforces three runtime rules
     that static permissions can't express:
 
-      1. PATH BOUNDARY       — all writes must resolve inside %USERPROFILE%\Knowledge\
+      1. PATH BOUNDARY       — all writes must resolve inside %USERPROFILE%\Paperwik\
       2. COMPOUND COMMANDS   — blocks &&, ||, ;, |, backticks, $() in Bash commands
       3. SAFE GIT SUBSET     — only add/commit/status/log --oneline/checkout HEAD~1 allowed
 
@@ -38,7 +38,7 @@ try {
     $timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
 
     # 2. Determine vault root (single-vault architecture)
-    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Knowledge"
+    $vaultRoot = Join-Path -Path $env:USERPROFILE -ChildPath "Paperwik"
     $normalizedVault = $null
     if (Test-Path $vaultRoot) {
         $normalizedVault = (Resolve-Path -Path $vaultRoot).Path

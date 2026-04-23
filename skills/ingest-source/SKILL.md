@@ -13,7 +13,7 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 # ingest-source
 
 You are about to process a new source and weave it into the user's single-vault
-knowledge base at `%USERPROFILE%\Knowledge\`. This skill is the central
+knowledge base at `%USERPROFILE%\Paperwik\`. This skill is the central
 product operation — do it thoroughly, not quickly.
 
 ## Triggers
@@ -70,7 +70,7 @@ folder called 'X' because this source doesn't fit any existing topic closely."*
 ### 4. Write the summary page
 
 Create a new markdown file at
-`%USERPROFILE%\Knowledge\<project_name>\<slug-of-title>.md`. Use the frontmatter
+`%USERPROFILE%\Paperwik\<project_name>\<slug-of-title>.md`. Use the frontmatter
 and structure from step 2. Use standard markdown links — `[Other Page](../Project/Other-Page.md)` — not wikilinks.
 
 ### 5. Create or update entity pages

@@ -17,7 +17,7 @@
 $ErrorActionPreference = "Stop"
 
 try {
-    $vaultRoot = Join-Path $env:USERPROFILE "Knowledge"
+    $vaultRoot = Join-Path $env:USERPROFILE "Paperwik"
     $evalPath = Join-Path $vaultRoot "eval.json"
     $dbPath = Join-Path $vaultRoot "knowledge.db"
 
