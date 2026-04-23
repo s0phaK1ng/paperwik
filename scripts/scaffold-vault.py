@@ -1,7 +1,12 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.12,<3.13"
 # dependencies = []
 # ///
+#
+# Python pinned to 3.12.x for consistency with the rest of the Paperwik
+# scripts. Scaffolder itself has no third-party dependencies so this
+# wouldn't strictly matter here, but using the same Python version across
+# all scripts lets uv share a single cached interpreter.
 r"""
 scaffold-vault.py — First-run setup for Paperwik.
 

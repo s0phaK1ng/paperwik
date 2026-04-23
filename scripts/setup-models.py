@@ -1,11 +1,14 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.12,<3.13"
 # dependencies = [
 #     "fastembed>=0.4.0",
 #     "flashrank>=0.2.9",
 #     "spacy>=3.7.0",
 # ]
 # ///
+#
+# Python pinned to 3.12.x for wheel compatibility. See embeddings.py
+# for the detailed reason (py-rust-stemmers / MSVC-link shadow).
 """
 setup-models.py — First-ingest retrieval-model bootstrap.
 

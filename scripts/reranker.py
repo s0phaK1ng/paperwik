@@ -1,9 +1,13 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.12,<3.13"
 # dependencies = [
 #     "flashrank>=0.2.9",
 # ]
 # ///
+#
+# Python pinned to 3.12.x for wheel compatibility across the full
+# retrieval stack. See embeddings.py for the detailed reason
+# (py-rust-stemmers / MSVC-link shadow).
 """
 reranker.py — FlashRank cross-encoder wrapper.
 

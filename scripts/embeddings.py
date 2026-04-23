@@ -1,9 +1,17 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.12,<3.13"
 # dependencies = [
 #     "fastembed>=0.4.0",
 # ]
 # ///
+#
+# Python is pinned to 3.12.x because one of fastembed's transitive
+# dependencies (py-rust-stemmers) lacks pre-built Windows wheels for
+# Python 3.13+. Without a wheel, uv falls back to a Rust source build
+# that requires MSVC's link.exe, which on machines with Git-for-Windows
+# on PATH gets shadowed by GNU link and fails ("link: extra operand").
+# 3.12 wheels exist, so no source build happens and the shadow issue
+# becomes moot. Relax this when py-rust-stemmers ships 3.13 wheels.
 """
 embeddings.py — Fastembed wrapper for Paperwik.
 
