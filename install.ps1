@@ -28,6 +28,50 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.4.2 -- skill namespace pass. Every paperwik skill now starts
+    with "paperwik-" so they show up as a contiguous alphabetical
+    block in Claude Code's / menu and dad can immediately see which
+    skills came from paperwik vs other plugins. Matt flagged in the
+    sandbox: scanning a mixed skill list for paperwik's skills was
+    slow; prefixed names are self-labeling.
+
+    Renames (directory + SKILL.md frontmatter name:):
+      ingest            -> paperwik-ingest
+      lint              -> paperwik-lint
+      measure-retrieval -> paperwik-measure-retrieval
+      proactive-reauth  -> paperwik-proactive-reauth
+      rebuild-index     -> paperwik-rebuild-index
+      redact            -> paperwik-redact
+      research          -> paperwik-research
+      undo              -> paperwik-undo
+    paperwik-help already had the prefix from v0.3.0.
+
+    What DIDN'T change:
+      - Natural-language trigger phrases. "Ingest this", "undo that",
+        "research X thoroughly", "scrub X from my wiki", etc. all
+        still fire correctly -- the skill descriptions unchanged.
+      - Hooks, scripts, plugin.json structure.
+      - The plugin's internal alias (still "pw" in plugin.json).
+
+    What changed:
+      - 8 skill directories renamed via git mv (history preserved)
+      - 8 SKILL.md frontmatter name: fields updated to match
+      - Cross-references in paperwik-research SKILL.md DO NOT TRIGGER
+        list + backend_swap_contract.md + CLAUDE.md template +
+        README.md + index_source.py + retrieval_eval.py +
+        templates/paperwik/.gitignore all updated to use the new names
+      - plugin.json + marketplace.json bumped 0.4.1 -> 0.4.2
+
+    No code changes to hooks, scripts, or skill logic. Pure namespace
+    refactor. The / menu now shows:
+      paperwik-help, paperwik-ingest, paperwik-lint,
+      paperwik-measure-retrieval, paperwik-proactive-reauth,
+      paperwik-rebuild-index, paperwik-redact, paperwik-research,
+      paperwik-undo
+    as a contiguous block. Users without any other plugin installed
+    will see ~9 paperwik-* skills + a handful of Claude Code built-ins
+    and nothing else.
+
     v0.4.1 -- doc-sweep hotfix. Matt flagged three gaps in v0.4.0:
     (1) the README hadn't been updated to reflect current behavior
     (still said "Pre-alpha, v0.1.0 is the first public release" at

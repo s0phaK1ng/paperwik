@@ -20,7 +20,7 @@
 # on disk for query/recovery; no version-control value per-revision.
 .claude/chat-history/
 
-# Retrieval index — regeneratable from markdown via the rebuild-index skill
+# Retrieval index — regeneratable from markdown via the paperwik-rebuild-index skill
 knowledge.db
 knowledge.db-shm
 knowledge.db-wal

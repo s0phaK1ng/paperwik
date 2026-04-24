@@ -150,7 +150,7 @@ def extract_text(source_path: Path) -> str:
         stripper.close()
         return stripper.text()
     # Default: best-effort plain read. PDF/DOCX conversion is expected to
-    # happen upstream (the ingest skill converts before calling us).
+    # happen upstream (the paperwik-ingest skill converts before calling us).
     return source_path.read_text(encoding="utf-8", errors="replace")
 
 

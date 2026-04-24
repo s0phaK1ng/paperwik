@@ -105,7 +105,7 @@ a page. Report findings; make fixes on request.
 
 ### Research (user says "research X thoroughly")
 
-Invoke the `research` skill. ~10-min 4-phase pipeline producing a cited long-form synthesis dropped into `Vault/Inbox/`. Always show the cost/time confirmation before engaging. Do NOT invoke for short factual questions — those are Query, not Research.
+Invoke the `paperwik-research` skill. ~10-min 4-phase pipeline producing a cited long-form synthesis dropped into `Vault/Inbox/`. Always show the cost/time confirmation before engaging. Do NOT invoke for short factual questions — those are Query, not Research.
 
 ## Memory discipline
 

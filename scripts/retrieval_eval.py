@@ -9,7 +9,7 @@ Reads <vault>/eval.json, replays each question against the current search
 pipeline, computes metrics, stores results in the eval_runs table of
 knowledge.db, and alerts the diagnostic log if any metric drops ≥0.05 WoW.
 
-Usage (invoked by /measure-retrieval skill or weekly Task Scheduler cron):
+Usage (invoked by /paperwik-measure-retrieval skill or weekly Task Scheduler cron):
     uv run retrieval_eval.py
 
 Exit codes: 0 = ran successfully (metrics in DB); non-zero = hard failure.

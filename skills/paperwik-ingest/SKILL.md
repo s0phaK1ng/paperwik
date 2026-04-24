@@ -1,5 +1,5 @@
 ---
-name: ingest
+name: paperwik-ingest
 description: >
   Process a source document from the user's Vault/Inbox/ folder and weave it into the
   wiki. Triggers on phrases like "ingest this", "process the new source",

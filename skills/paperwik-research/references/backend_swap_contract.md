@@ -20,7 +20,7 @@ depend ONLY on:**
 **Downstream systems may NOT depend on:**
 
 - Any file under `~/Paperwik/.claude/skills/state/deep-research/` (internal)
-- Any script under `plugin/skills/research/scripts/` (internal)
+- Any script under `plugin/skills/paperwik-research/scripts/` (internal)
 - Any hook under `plugin/hooks/subagent_{start,stop}.py` (internal)
 - The number of sections, the chunking strategy, the fuzzy threshold, or
   any other implementation detail
@@ -78,7 +78,7 @@ Two enforcement mechanisms:
 1. **SKILL.md Invariants §2**: "One engine entrypoint. Other skills/scripts
    must not call internal phases directly."
 2. **Code review discipline**: any PR that adds a reference to
-   `plugin/skills/research/scripts/` or
+   `plugin/skills/paperwik-research/scripts/` or
    `~/Paperwik/.claude/skills/state/deep-research/` from outside this skill's
    own directory must be rejected and refactored to depend on the file drop
    instead.

@@ -1,14 +1,14 @@
 ---
-name: research
+name: paperwik-research
 description: >
   This skill should be used when the user asks to "research X thoroughly",
   "do deep research on Y", "write a deep research report on Z", "get me a
   long writeup on X", "produce a research doc on Y", "investigate X in
   depth", or "deep dive on X". Produces a 3,000-8,000 word synthesis document
   with 15+ cited sources, YAML frontmatter, H2/H3 structure, and a Sources
-  table -- dropped into the Vault/Inbox/ for the `ingest` skill to absorb.
+  table -- dropped into the Vault/Inbox/ for the `paperwik-ingest` skill to absorb.
   DO NOT TRIGGER on short factual questions ("what is X"), on "ingest this"
-  (that's the `ingest` skill), on general notes or journaling, or on the
+  (that's the `paperwik-ingest` skill), on general notes or journaling, or on the
   user typing something that reads like an Obsidian page title rather than
   a research topic. Takes ~10 minutes and consumes a meaningful chunk of
   the user's weekly Claude subscription budget -- the skill always shows a
@@ -21,7 +21,7 @@ version: 0.4.0
 Execute a 4-phase hierarchical research loop using only Claude Code native
 primitives: WebSearch, WebFetch, Task subagents, and the SubagentStop hook.
 Produce a markdown file that lands in the user's Vault/Inbox/ and is then
-picked up by the `ingest` skill like any other source.
+picked up by the `paperwik-ingest` skill like any other source.
 
 ## Phase 0 — Pre-flight (MANDATORY, before any engine work)
 
@@ -322,14 +322,14 @@ All per-run state lives under:
 The `research` skill is the heavy-weight option. These other requests
 should NOT trigger it:
 
-- "ingest this" / "add this source" -- that's the `ingest` skill
+- "ingest this" / "add this source" -- that's the `paperwik-ingest` skill
 - "what is X" / "explain X" / "summarize X" -- normal Q&A, not a research run
 - "find X in my wiki" -- that's a wiki query, not new research
-- "undo that" -- that's the `undo` skill
-- "scrub X from my wiki" -- that's the `redact` skill
-- "check my wiki for problems" / "lint" -- that's the `lint` skill
+- "undo that" -- that's the `paperwik-undo` skill
+- "scrub X from my wiki" -- that's the `paperwik-redact` skill
+- "check my wiki for problems" / "lint" -- that's the `paperwik-lint` skill
 - "how do I use Paperwik" / "what can you do" -- that's the `paperwik-help` skill
-- "rebuild the index" -- that's the `rebuild-index` skill
+- "rebuild the index" -- that's the `paperwik-rebuild-index` skill
 
 If the user asks something that could go either way, default to the
 lighter-weight skill (or plain Q&A) and only invoke `research` when the

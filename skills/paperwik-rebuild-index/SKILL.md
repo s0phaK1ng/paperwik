@@ -1,5 +1,5 @@
 ---
-name: rebuild-index
+name: paperwik-rebuild-index
 description: >
   Rebuild knowledge.db from the markdown source of truth. Use when the
   database is missing, corrupted, restored from a backup that has stale

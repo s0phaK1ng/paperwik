@@ -71,7 +71,7 @@ If you want to write an adapter, open an issue — happy to collaborate.
 - **Entity graph** — PERSON / CONCEPT / PAPER / ORGANIZATION extracted at ingest, stored in SQLite.
 - **Compaction-resilient memory** — PreCompact + SessionStart(compact) hook pair writes salient state to disk before Claude's auto-compression and re-hydrates after.
 - **YOLO-safe permissions** — `defaultMode: bypassPermissions` + a broad `Bash(*)` allow list + a PowerShell `PreToolUse` governor that blocks path traversal, compound shell, and unsafe git, plus a destructive-op deny list (rm -rf, git push --force, etc.). Zero approval prompts during routine use, without a wide-open security posture.
-- **Deep research, in-session** — a 4-phase `research` skill (PLANNER → SEARCHER → parallel SECTION WRITERS → EDITOR) that uses only Claude Code native primitives (WebSearch, WebFetch, Task subagents). Drops a 3-8K word synthesis document into Vault/Inbox/ for the existing ingest flow to absorb. Pro-tier aware: Sonnet for synthesis, Haiku for retrieval, default 3 sections, up-front cost/time confirmation gate.
+- **Deep research, in-session** — a 4-phase `paperwik-research` skill (PLANNER → SEARCHER → parallel SECTION WRITERS → EDITOR) that uses only Claude Code native primitives (WebSearch, WebFetch, Task subagents). Drops a 3-8K word synthesis document into Vault/Inbox/ for the existing ingest flow to absorb. Pro-tier aware: Sonnet for synthesis, Haiku for retrieval, default 3 sections, up-front cost/time confirmation gate.
 - **Silent Git autosave** — every file mutation committed invisibly, enabling a conversational `revert-state` skill for "undo that."
 - **Weekly retrieval eval** — 20-question NDCG@10/MRR/Recall@5 harness against a user-authored question set, alerts on 0.05 WoW drop.
 - **True redaction** — `git filter-repo`-backed skill with four-gate safety (dry-run → explicit confirm phrase → second gate on >20 files → wiki-name typed confirmation). Writes tombstones to prevent reconstruction.
@@ -128,7 +128,7 @@ Major architectural decisions are tracked in the parent project's knowledge base
 
 ## Status
 
-**v0.4.0 (April 2026).** Current release. First target user is a non-technical Windows user doing heavy Gemini Deep Research. Free and open source; no ads, no subscriptions beyond your own Claude Pro/Max plan. The v0.4.0 ship adds an in-session `research` skill so users don't need to bounce out to Gemini Deep Research and back; see the `.NOTES` block in `install.ps1` for the full changelog.
+**v0.4.0 (April 2026).** Current release. First target user is a non-technical Windows user doing heavy Gemini Deep Research. Free and open source; no ads, no subscriptions beyond your own Claude Pro/Max plan. The v0.4.0 ship added an in-session `paperwik-research` skill so users don't need to bounce out to Gemini Deep Research and back; see the `.NOTES` block in `install.ps1` for the full changelog.
 
 ## License
 

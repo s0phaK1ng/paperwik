@@ -1,5 +1,5 @@
 ---
-name: redact
+name: paperwik-redact
 description: >
   Permanently purges a topic, name, file, or phrase from the user's vault AND
   from its git history. Use when the user says things like "redact X",
