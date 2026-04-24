@@ -28,6 +28,12 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.3.1 -- hotfix. Ships scripts/make_docx.sh that was silently
+    excluded from v0.3.0 by the repo's .gitignore (build/ is matched
+    against Python build artifacts). Moved the script to scripts/
+    alongside the existing Python build tools. Updated the BRAND path
+    reference inside the script. No other changes.
+
     v0.3.0 -- friends-and-family bootstrap. Ships in-product help: the
     agent can now answer "how do I use Paperwik?" / "what can you do?"
     / "why isn't X working?" with grounded, correct answers sourced from
@@ -48,9 +54,11 @@
                                   Plugins-UI gotchas, DLL errors,
                                   diagnostic log)
         These are the ONLY source of truth for user-facing help.
-      - NEW build/make_docx.sh: pandoc pipeline. Concatenates the three
-        references into docs/Paperwik-User-Guide.docx. Re-runnable on
-        every release.
+      - NEW scripts/make_docx.sh: pandoc pipeline. Concatenates the
+        three references into docs/Paperwik-User-Guide.docx. Re-runnable
+        on every release. (Originally at build/make_docx.sh in v0.3.0's
+        commit but that path was gitignored; moved and re-shipped
+        correctly in v0.3.1.)
       - NEW hooks/Show-First-Run-Hint.ps1: sentinel-guarded one-time
         SessionStart message ("Tip: ask me 'how do I use Paperwik?'
         any time"). Never repeats. Registered under SessionStart's
