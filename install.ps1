@@ -28,11 +28,30 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.2.3 — friends-and-family bootstrap. Fixes a silent marketplace-
-    registration bug discovered during v0.2.2 end-to-end test: Desktop's
-    Plugin UI did not recognize our extraKnownMarketplaces entry and
-    paperwik never appeared in + → Plugins → Personal, even though the
-    CLI accepted the same entry without complaint.
+    v0.2.4 — friends-and-family bootstrap. Adds explicit Desktop-restart
+    guidance to the post-install walkthrough. Discovered during v0.2.3
+    fresh-sandbox verification: on first launch after install, Claude
+    Desktop does not display the newly-registered paperwik marketplace
+    under + → Plugins → Personal. The section is missing entirely, as
+    if no user-scope marketplaces were configured. Full quit + reopen
+    of Claude Desktop (including tray icon) makes it appear. Likely
+    cause: Desktop caches plugin config at process startup and does not
+    re-scan settings.json during session lifetime — any pre-written
+    entries from an installer that ran while Desktop was open (or that
+    wrote settings.json while Desktop was initializing) require a
+    second start to surface. Not fixable from the installer side;
+    users must restart Claude once. Logged as decision #312.
+
+    Changes from v0.2.3:
+      - Final-message step 2 now warns: "If Claude was already open
+        during install, FULLY QUIT IT FIRST (tray icon -> Quit), then
+        reopen." Addresses the case where the user had Claude open
+        when they ran the installer.
+      - Final-message step 5 gains a fallback paragraph: "If you don't
+        see 'Personal' at all, fully quit Claude and reopen." Addresses
+        the case where even a clean first-launch fails to surface the
+        plugin until a second launch.
+      - No code changes. Text-only.
 
     Changes from v0.2.2:
       - Fix the extraKnownMarketplaces source shape written to
@@ -1177,6 +1196,9 @@ Write-Host ""
 Write-Host "  1. Close this window." -ForegroundColor White
 Write-Host ""
 Write-Host "  2. Open Claude (Start menu -> Claude)." -ForegroundColor White
+Write-Host "     If Claude was already open during install, FULLY QUIT IT FIRST" -ForegroundColor DarkYellow
+Write-Host "     (right-click the Claude icon in the system tray -> Quit)," -ForegroundColor DarkYellow
+Write-Host "     then reopen. Claude only sees new plugins on a fresh start." -ForegroundColor DarkYellow
 Write-Host ""
 Write-Host "  3. Click the Code tab in the left sidebar." -ForegroundColor White
 Write-Host ""
@@ -1186,9 +1208,13 @@ Write-Host ""
 Write-Host "  5. Turn on Paperwik (one time, takes 5 seconds):" -ForegroundColor White
 Write-Host "       - Click the + button to the left of the chat box" -ForegroundColor White
 Write-Host "       - Click 'Plugins'" -ForegroundColor White
-Write-Host "       - Click 'paperwik' under Personal" -ForegroundColor White
+Write-Host "       - Look for 'Personal' section and click 'paperwik'" -ForegroundColor White
 Write-Host "       - Click the + (or Enable) on the paperwik detail page" -ForegroundColor White
 Write-Host "     After that, Paperwik's skills appear when you type / in the chat." -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "     If you don't see the 'Personal' section at all, Claude hasn't" -ForegroundColor DarkYellow
+Write-Host "     picked up the new plugin yet. Fully quit Claude (tray icon ->" -ForegroundColor DarkYellow
+Write-Host "     Quit) and reopen it, then try again. One restart is enough." -ForegroundColor DarkYellow
 Write-Host ""
 Write-Host "  6. Type what you want, like:" -ForegroundColor White
 Write-Host "        ingest https://example.com/an-article-i-want-saved" -ForegroundColor Yellow
