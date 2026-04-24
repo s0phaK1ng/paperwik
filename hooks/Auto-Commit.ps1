@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    PostToolUse hook — silent git auto-commit of vault changes.
+    PostToolUse hook -- silent git auto-commit of vault changes.
 
 .DESCRIPTION
     Fires after Write / Edit / MultiEdit / NotebookEdit tool calls. Runs
@@ -12,7 +12,7 @@
     git failures so a bad commit attempt never blocks the agent.
 
     Scope: agent-initiated edits only (triggered by PostToolUse). Manual
-    file changes by the user are not auto-committed — the user's workflow
+    file changes by the user are not auto-committed -- the user's workflow
     in Obsidian doesn't need an audit trail for their own actions.
 
 .NOTES
@@ -49,7 +49,7 @@ try {
     try {
         # The installer is responsible for creating .git and the initial
         # snapshot (install.ps1 step 7(c3)). If .git isn't here, something
-        # went wrong in install; don't try to init from the hook — staging
+        # went wrong in install; don't try to init from the hook -- staging
         # a fresh vault takes longer than the hook's timeout budget and
         # would leave a half-initialized repo with a stale index.lock.
         if (-not (Test-Path '.git')) {
@@ -57,7 +57,7 @@ try {
                 $docs = [Environment]::GetFolderPath("MyDocuments")
                 $log = Join-Path $docs 'Paperwik-Diagnostics.log'
                 $ts = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
-                Add-Content -Path $log -Value "[$ts] [Auto-Commit] SKIP: .git missing in $vault — expected installer to create it" -ErrorAction SilentlyContinue
+                Add-Content -Path $log -Value "[$ts] [Auto-Commit] SKIP: .git missing in $vault - expected installer to create it" -ErrorAction SilentlyContinue
             } catch {}
             exit 0
         }
@@ -90,7 +90,7 @@ try {
         Pop-Location
     }
 } catch {
-    # Never propagate errors — hook must be silent and non-blocking
+    # Never propagate errors -- hook must be silent and non-blocking
     try {
         $documentsPath = [Environment]::GetFolderPath("MyDocuments")
         $logPath = Join-Path $documentsPath 'Paperwik-Diagnostics.log'

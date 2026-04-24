@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Stop hook — silent chat archival + decision extraction.
+    Stop hook -- silent chat archival + decision extraction.
 
 .DESCRIPTION
     Fires at the end of every assistant response turn. Does two things,
@@ -10,12 +10,12 @@
        ~/Paperwik/.claude/chat-history/<session-id>.jsonl so the complete
        conversation is always on disk and available for later queries.
        (The original transcript lives in Claude Code's project-scoped cache
-       and can age out or get archived — mirroring into the vault gives
+       and can age out or get archived -- mirroring into the vault gives
        the user a durable copy alongside their knowledge base.)
 
     2. Scan the most recent user message + assistant response for
        decision-making language. If found, append a one-line entry to
-       ~/Paperwik/decisions.md silently — no user prompt, no confirmation.
+       ~/Paperwik/decisions.md silently -- no user prompt, no confirmation.
 
     The user's design directive: "remember everything. don't make me ask."
     This hook implements that. No dialog surfaces; it all happens in the
@@ -141,7 +141,7 @@ try {
     if (-not $combined.Trim()) { exit 0 }
 
     # Decision phrase patterns. Regex, case-insensitive.
-    # Conservative set — matches commitment language, ignores hypotheticals.
+    # Conservative set -- matches commitment language, ignores hypotheticals.
     $decisionPatterns = @(
         "let'?s go with\s+(.+?)(?:[\.\n]|$)",
         "(?:we|i)(?:'ve)?\s+decided(?:\s+on)?\s*:?\s*(.+?)(?:[\.\n]|$)",
@@ -184,7 +184,7 @@ auto-maintained: true
 # Decisions
 
 Append-only log of decisions made in conversation. Auto-captured by the
-Chat-Archive Stop hook — no user action required. Entries are timestamped
+Chat-Archive Stop hook -- no user action required. Entries are timestamped
 and keyed to the session so you can trace any decision back to its chat.
 
 "@
