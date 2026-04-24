@@ -109,6 +109,36 @@ a page. Report findings; make fixes on request.
   `active_context.md` so it survives. After compaction, re-read it. The
   hooks do this automatically.
 
+## Silent auto-archive (runs without user action)
+
+The following happen automatically in the background on every turn. The
+user never needs to ask. These are hook-driven — not skill-driven — so
+they fire reliably without any prompt routing:
+
+- **`PostToolUse` → `Auto-Commit.ps1`**: after any Write/Edit/MultiEdit/
+  NotebookEdit, runs `git add -A && git commit` inside `~/Paperwik/`. Gives
+  the user an Undo capability (git log / git revert). Initializes the
+  repo on first run if it doesn't exist. Silent.
+- **`Stop` → `Chat-Archive.ps1`**: after every assistant response, (a)
+  mirrors the full session transcript into
+  `~/Paperwik/.claude/chat-history/<session-id>.jsonl` so the complete
+  chat is always on disk in the vault; (b) scans the turn's user + assistant
+  text for decision-making language and silently appends matches to
+  `~/Paperwik/decisions.md`. Never prompts. Never asks "want me to log this?"
+- **`Stop` → `Rotate-Memory.ps1`**: rotates older sections of
+  `active_context.md` into `archived_index.md` when the active context
+  exceeds a size threshold. Silent.
+- **`PreCompact` → `Save-State.ps1`**: before Claude Code compacts the
+  context window, captures current state so it survives compaction.
+- **`SessionStart` (startup/resume/clear)** → `Rehydrate-Memory.ps1`:
+  re-reads `active_context.md` so you pick up where the prior session
+  left off.
+
+**Design intent**: the user should never have to say "file this" or
+"remember that." The system captures everything silently; the user asks
+questions and gets answers. Explicit operations (ingest, lint, redact)
+are the only things that require a user-triggered trigger phrase.
+
 ## Redaction check (MANDATORY — runs before every content-touching response)
 
 Before searching, summarizing, or reconstructing anything from the vault:

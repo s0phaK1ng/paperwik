@@ -63,6 +63,19 @@
       }
     ],
 
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/Auto-Commit.ps1\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+
     "PreCompact": [
       {
         "hooks": [
@@ -82,6 +95,11 @@
             "type": "command",
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/Rotate-Memory.ps1\"",
             "timeout": 1
+          },
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/Chat-Archive.ps1\"",
+            "timeout": 5
           }
         ]
       }

@@ -28,14 +28,41 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.2.6 — friends-and-family bootstrap. Fixes the permission-prompt
-    storm during normal agent operation. Users on v0.2.5 and earlier
-    got "Allow once / Allow always" dialogs constantly during ingest
-    because the vault's .claude/settings.json had defaultMode="dontAsk"
-    with a narrow Bash allow list covering only `uv run *`, `git *`,
-    `python -m spacy download *`. Everything else the agent routinely
-    runs (`ls`, `cat`, `echo`, `mkdir`, `find`, `mv`, pandoc, jq, etc.)
-    fell through to the prompt. Yolo mode was effectively off.
+    v0.2.7 — friends-and-family bootstrap. Real silent-autosave now,
+    not just in SKILL.md aspirations. v0.2.6 and earlier had SKILL.md
+    files (auto-file-chat, decision-logger) that looked like they'd
+    silently archive chat + log decisions, but neither was actually
+    wired to a hook — auto-file-chat had disable-model-invocation:true
+    (agent could not invoke it) and no hook called it, decision-logger
+    required explicit agent trigger AND asked the user for permission
+    before writing. Git autosave was mentioned in research but never
+    built. The user's explicit design directive: "remember everything.
+    don't make me ask." v0.2.7 builds the hook-driven silent version.
+
+    Changes from v0.2.6:
+      - NEW hook: PostToolUse -> Auto-Commit.ps1. After any Write /
+        Edit / MultiEdit / NotebookEdit, runs `git add -A && git commit`
+        inside ~/Paperwik/. Initializes the repo on first run. Gives
+        the user an Undo capability via git log / git revert. Silent.
+      - NEW hook: Stop -> Chat-Archive.ps1. After every assistant turn:
+        (a) mirrors the full session transcript from Claude Code's
+            cache into ~/Paperwik/.claude/chat-history/<session>.jsonl
+            so the complete chat is always in the vault on disk;
+        (b) regex-scans the turn's user+assistant text for decision
+            language ("let's go with X", "we decided", "final answer",
+            "I'll use X", "going forward", "settle on X", etc.) and
+            silently appends matches to ~/Paperwik/decisions.md.
+            Never asks. Never prompts. Non-blocking.
+      - REMOVED: skills/auto-file-chat/ (replaced by Chat-Archive hook).
+      - REMOVED: skills/decision-logger/ (replaced by silent regex in
+        Chat-Archive hook). The old skill asked the user before logging;
+        the new hook logs automatically per the "never ask" directive.
+      - CLAUDE.md template gains a "Silent auto-archive" section that
+        tells the agent these hooks run every turn and it should not
+        duplicate their work (don't manually update decisions.md, don't
+        try to file chat to disk — hooks handle it).
+      - plugin.json + marketplace.json bumped 0.2.6 -> 0.2.7.
+      - No install.ps1 code changes — fix lands through plugin git pull.
 
     Changes from v0.2.5:
       - templates/paperwik/.claude/settings.json:
