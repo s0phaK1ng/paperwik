@@ -28,6 +28,60 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.3.0 -- friends-and-family bootstrap. Ships in-product help: the
+    agent can now answer "how do I use Paperwik?" / "what can you do?"
+    / "why isn't X working?" with grounded, correct answers sourced from
+    three reference files that are ALSO the single source of truth for
+    the printed user guide. No more hand-maintained manual AND prompt AND
+    FAQ - one canonical markdown set feeds both surfaces.
+
+    Changes from v0.2.9:
+      - NEW skill: skills/paperwik-help/ with Anthropic-canonical
+        frontmatter (name + description + version only) and a body that
+        triages to one of three reference files.
+      - NEW references/*.md (Diataxis-aligned):
+          what-is-paperwik.md   (explanation: what it is, what it
+                                  can/can't do, where things live)
+          how-to.md             (how-to: ingest, search, undo, redact,
+                                  update, rebuild-index)
+          troubleshooting.md    (problem-solving: OAuth, rate limits,
+                                  Plugins-UI gotchas, DLL errors,
+                                  diagnostic log)
+        These are the ONLY source of truth for user-facing help.
+      - NEW build/make_docx.sh: pandoc pipeline. Concatenates the three
+        references into docs/Paperwik-User-Guide.docx. Re-runnable on
+        every release.
+      - NEW hooks/Show-First-Run-Hint.ps1: sentinel-guarded one-time
+        SessionStart message ("Tip: ask me 'how do I use Paperwik?'
+        any time"). Never repeats. Registered under SessionStart's
+        startup matcher alongside scaffold-vault and Rehydrate-Memory.
+      - CLAUDE.md template gains a 6-line pointer stanza telling the
+        agent to invoke paperwik-help for usage questions. Total stays
+        under Anthropic's 200-line soft cap (199 lines).
+      - DELETED: docs/DAY-ONE-TRAINING.md, docs/TROUBLESHOOTING.md,
+        docs/_build_user_guide.py, hand-authored Paperwik-User-Guide.docx.
+        Content folded into the three references. The new .docx is
+        regenerated from them via pandoc.
+      - PRESERVED: docs/OPERATIONAL-ENVELOPE.md (printable reference
+        sheet for the helper).
+      - plugin.json + marketplace.json bumped 0.2.9 -> 0.3.0.
+      - No code changes in install.ps1 itself. Fix lands through plugin
+        git pull + user clicking Update + Enable in Claude Desktop's
+        Plugin UI (decisions #309, #312, #316).
+
+    Research: research/extraction_embedded_help_knowledge.md summarizes
+    the 2026-04 Compass/Deep Research report that produced this design.
+    Anthropic's own plugins/plugin-dev/ ships seven domain-sliced skills
+    with no catch-all /help -- the pattern we copied.
+
+    v0.2.9 -- scrubbed em dashes from Auto-Commit.ps1 and Chat-Archive.ps1.
+    PS 5.1 reads .ps1 files from disk as Windows-1252 by default (when no
+    BOM is present); the UTF-8 em dash (bytes E2 80 94) misdecodes into
+    three chars ending in a quote character that prematurely closes
+    string literals. This had been parse-failing Auto-Commit.ps1 silently
+    on every hook invocation since v0.2.7. No install.ps1 changes; header
+    kept at v0.2.8 until now.
+
     v0.2.8 — friends-and-family bootstrap. Fixes two issues in v0.2.7's
     silent auto-archive implementation discovered during the first
     real end-to-end test.

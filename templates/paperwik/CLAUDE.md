@@ -178,6 +178,14 @@ If `.claude/tombstones.jsonl` does not exist, proceed normally.
 - **Ask once, cache the answer.** If content ambiguity forces a question,
   only ask once — learn and route the same pattern automatically next time.
 
+## User-facing help
+
+When the user asks how to use Paperwik itself ("how do I...", "what can you
+do", "what is this", "why isn't X working", "I'm confused", "where did my
+file go"), invoke the `paperwik-help` skill. Don't answer from general
+knowledge -- the skill's three reference files have the specific behaviors to
+quote. Style: five sentences or fewer, non-technical, specific next action.
+
 ## What the user experiences
 
 - Opens Obsidian and sees three folders: `Welcome.md`, `Inbox/`, `Projects/`.
