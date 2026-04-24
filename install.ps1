@@ -28,6 +28,17 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.4.3 -- author attribution. Claude Desktop's plugin detail page
+    previously showed "Paperwik Maintainer" as the author, which is
+    generic and doesn't link anywhere. Changed to "s0phak1ng" with a
+    url pointing at the GitHub profile so the author name becomes a
+    clickable link in Desktop's plugin UI. No code changes.
+
+    Updates in v0.4.3:
+      - plugin.json author: name -> "s0phak1ng" + url to GitHub profile
+      - marketplace.json owner: same treatment
+      - plugin.json + marketplace.json bumped 0.4.2 -> 0.4.3
+
     v0.4.2 -- skill namespace pass. Every paperwik skill now starts
     with "paperwik-" so they show up as a contiguous alphabetical
     block in Claude Code's / menu and dad can immediately see which
