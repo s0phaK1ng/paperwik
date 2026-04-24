@@ -12,6 +12,16 @@
 
 Paste or type: **ingest this article: https://example.com/interesting-thing**. Paperwik fetches the page, saves a cleaned markdown copy into `Vault/Inbox/`, and then runs the normal ingest flow.
 
+## Do deep research on a topic
+
+Say **research cognitive health thoroughly** (substitute any topic). Paperwik runs a 4-phase research pipeline using Claude's built-in web tools -- no external APIs or keys required. Takes ~8-12 minutes. Drops a 3,000-8,000 word synthesis with 15+ cited sources into `Vault/Inbox/`. You then say "ingest this" the same way you would for any source.
+
+Before the run starts, Paperwik shows you a cost/time estimate like "this will take ~10 min and consume roughly 2-4 Sonnet hours of your weekly budget." Say **yes** or **proceed** to continue, or **no** or **wait** to cancel. Don't skip this gate -- it's there so you know what you're spending before you spend it.
+
+The first time you ever run research, Paperwik also shows a one-time note explaining that research always uses Sonnet + Haiku regardless of which model you've picked in the main chat. That note never repeats.
+
+Good topics for research: anything broad enough to deserve a long cited writeup. Bad topics: "what year was the Eiffel Tower built" (too small -- just ask the question directly) or "my grocery list for tomorrow" (nothing to research).
+
 ## Search your wiki
 
 Just ask a plain-English question in the Code tab. Examples:

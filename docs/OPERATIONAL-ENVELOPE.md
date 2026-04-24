@@ -4,6 +4,8 @@ A friendly reference sheet for the person using Paperwik. Good to keep
 handy for the first few weeks. The installer usually hands this over at
 the end of the training session.
 
+*Current as of Paperwik v0.4.0.*
+
 ---
 
 ## What your helper is happy to do
@@ -17,13 +19,30 @@ the end of the training session.
 
 ### Read new sources for you
 - Drop a PDF, a markdown export, or a Gemini Deep Research report into
-  `_Inbox/`.
+  `Vault/Inbox/`.
 - Say *"ingest this"* or *"ingest the new source."*
 - Your helper reads it, writes a summary, creates a topical folder (or
   files it into an existing one), pulls out the people and ideas and
   papers, and weaves everything into your wiki.
-- Your original source isn't deleted — it just moves from `_Inbox/` into
-  `<Project>/_sources/` so your Inbox stays tidy.
+- Your original source isn't deleted — it just moves from `Vault/Inbox/`
+  into `Vault/Projects/<Project>/_sources/` so your Inbox stays tidy.
+
+### Research a topic for you, end-to-end
+- Say *"research [topic] thoroughly"* — for example,
+  *"research cognitive health strategies thoroughly."*
+- Your helper runs a 4-phase research pipeline using Claude's built-in
+  web search. Takes roughly 10 minutes. No extra API keys needed.
+- Before the run starts, you'll see a cost/time estimate ("this will
+  use about 3 hours of your weekly Claude budget") — say "yes" to proceed
+  or "no" to cancel. Non-technical users have zero intuition for these
+  numbers; this gate is there on purpose.
+- The finished report drops into `Vault/Inbox/` with a readable name
+  like "Cognitive Health Strategies - 2026-04-24.md". You then say
+  *"ingest this"* the same way as any source.
+- The first time you ever run research, your helper shows a one-time
+  note explaining that research always uses Sonnet and Haiku behind the
+  scenes, regardless of which model you picked in the Claude Desktop
+  dropdown. The note never repeats.
 
 ### Answer questions with sources
 - *"What do I know about X?"* or *"Summarize what I've read on Y."*
@@ -84,11 +103,15 @@ the end of the training session.
 - Searching, embedding, and reranking all happen locally on your
   machine. Queries don't require internet after the first-time setup.
 
-### Run arbitrary commands
-- Only specific, pre-approved commands are allowed: the bundled
-  retrieval scripts, safe Git operations, and one spaCy model download.
-- If the helper ever seems to want to run something else, that's a bug —
-  please tell your installer.
+### Run arbitrary destructive commands
+- Ordinary shell commands run without prompting you ("Allow" dialogs),
+  because waking a non-technical user up to approve every bash step is
+  annoying. But the dangerous ones are blocked by a deny list and a
+  safety hook: no `rm -rf`, no `git push --force`, no `git reset --hard`,
+  no `format`, `diskpart`, `shutdown`, `taskkill /F`. The helper can't
+  touch anything outside `C:\Users\<you>\Paperwik\` either.
+- If the helper ever seems to want to run something that feels wrong,
+  press `Ctrl+C` and tell your installer.
 
 ### Burn through your Claude quota without warning
 - Claude Pro / Max plans have message limits. Heavy ingest sessions
@@ -108,23 +131,29 @@ the end of the training session.
 
 | File / folder | What it's for |
 |---|---|
-| `Paperwik\` | Your entire vault |
-| `Paperwik\_Inbox\` | Drop zone for new sources |
-| `Paperwik\_Archive\` | Auto-archived inactive projects |
-| `Paperwik\<Project Name>\` | Topical folders your helper creates |
+| `Paperwik\` | Your entire Paperwik workspace (system root) |
+| `Paperwik\Vault\` | What Obsidian opens — the user-facing layer |
+| `Paperwik\Vault\Inbox\` | Drop zone for new sources + finished research reports |
+| `Paperwik\Vault\Projects\<Project>\` | Topical folders your helper creates |
+| `Paperwik\Vault\Projects\<Project>\Entities\` | Person / concept / paper / organization pages |
+| `Paperwik\Vault\Projects\<Project>\_sources\` | Original source files after ingest |
+| `Paperwik\CLAUDE.md` | Instructions your helper reads every session — leave this alone |
 | `Paperwik\index.md` | The full list of everything in your wiki |
 | `Paperwik\log.md` | Diary of what your helper has been up to |
-| `Paperwik\decisions.md` | Things you've decided (once logged) |
+| `Paperwik\decisions.md` | Things you've decided (auto-captured from chat) |
 | `Paperwik\knowledge.db` | The search index — leave this alone |
 | `Paperwik\eval.json` | Your 20 questions for weekly quality checks |
 | `Paperwik\.claude\` | Hidden config — leave this alone |
+| `Paperwik\.claude\chat-history\` | Full chat transcripts, one JSONL per session |
 | `Documents\Paperwik-Diagnostics.log` | Your helper's diary |
 | `Documents\Paperwik-Audit.log` | Redaction records (when you use them) |
 
 ## Things to say, any time
 
 The every-day stuff:
-- **"Ingest this"** — reads and files the newest thing in `_Inbox/`.
+- **"Ingest this"** — reads and files the newest thing in `Vault/Inbox/`.
+- **"Research [topic] thoroughly"** — ~10-min cited research report
+  dropped in `Vault/Inbox/`. Shows a cost/time estimate before it runs.
 - **"What do I know about X?"** — searches and summarizes with sources.
 - **"File that as a new page"** — turns the answer you just got into a
   lasting wiki page.

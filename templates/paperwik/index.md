@@ -14,8 +14,8 @@ Dataview query below renders dynamically from the YAML frontmatter on each page.
 
 ```dataview
 TABLE file.folder AS "Project", length(file.outlinks) AS "Links out", length(file.inlinks) AS "Links in", dateformat(file.mtime, "yyyy-MM-dd") AS "Last updated"
-FROM "" 
-WHERE !contains(file.folder, "_Archive") AND !contains(file.folder, "_Inbox") AND file.name != "index" AND file.name != "log" AND file.name != "Welcome" AND file.name != "CLAUDE"
+FROM "Vault/Projects"
+WHERE !contains(file.folder, "_sources") AND !contains(file.folder, "Inbox") AND file.name != "index" AND file.name != "log" AND file.name != "Welcome" AND file.name != "CLAUDE"
 SORT file.mtime DESC
 ```
 
@@ -27,11 +27,11 @@ FROM #person OR #paper OR #concept OR #organization
 SORT file.name ASC
 ```
 
-## Archived
+## Inbox (pending sources to ingest)
 
 ```dataview
 LIST
-FROM "_Archive"
+FROM "Vault/Inbox"
 SORT file.mtime DESC
 ```
 

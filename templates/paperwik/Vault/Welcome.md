@@ -41,6 +41,10 @@ on a normal internet connection — after that, ingests are fast.
 
 - *"Ingest this."* — Reads the newest file in `Inbox/` and files it.
 - *"Ingest [URL]."* — Fetches the URL, saves it, and files it.
+- *"Research [topic] thoroughly."* — Your helper spends ~10 minutes
+  reading the web and writes a cited long-form report, then drops it
+  in `Inbox/` so you can "ingest this" the same way as any source. You'll
+  see a cost/time estimate before the run starts — say "yes" or "no".
 - *"What do I know about X?"* — Finds what you've read and gives you an
   answer with sources.
 - *"File that for me."* — After a good answer, saves it as a lasting page.

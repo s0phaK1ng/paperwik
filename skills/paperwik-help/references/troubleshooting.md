@@ -115,6 +115,48 @@ If you don't know which project Paperwik filed it under, ask: **"which project d
 
 ---
 
+## "The research run stopped partway and didn't produce a file"
+
+**What you'll see**: no new file in `Vault/Inbox/` even though you asked for research minutes ago, or a partial run that errored out.
+
+**Why it can happen**:
+- Your laptop went to sleep. Paperwik sets a wake-lock at the start of a run, but if your laptop is on battery OR the wake-lock `powercfg` call failed, Windows will still suspend the session mid-run.
+- Your Claude Pro 5-hour window filled up mid-run. A research run uses ~30-50 prompts; if you'd already spent most of your window on other work, the run gets throttled halfway.
+- A `SubagentStop` hook failed to fire for one of the section writers. Drafts exist but the `ready_to_stitch` sentinel never wrote.
+
+**Fix**:
+1. Check `C:\Users\<you>\Documents\Paperwik-Diagnostics.log` for the last 50 lines. Look for `research_status`, `HOOK_CRASH`, or rate-limit errors.
+2. Look inside `C:\Users\<you>\Paperwik\.claude\skills\state\deep-research\runs\` -- each run has its own subdirectory. The most recent one will have partial `drafts/s1.md`, `drafts/s2.md` etc. You can open these manually if you want to salvage what was written.
+3. If the run just needs to continue: close and reopen Claude Desktop, then say **research [same topic] again**. Paperwik starts fresh; the partial run stays on disk for reference but doesn't merge in.
+4. Plug the laptop into AC power before the next run.
+
+---
+
+## "Research burned my whole week's budget"
+
+**What you'll see**: after running research, Claude Pro says you've hit your weekly usage cap and can't do anything else until the window resets.
+
+**Why**: the default is 3 section writers to keep a single run within comfortable Pro-tier limits. But if you asked for a longer document (8-12 sections), or ran research back-to-back, you can exhaust the ~40-80 weekly Sonnet hours.
+
+**Fix**:
+1. Wait for the weekly reset (7 days from your first request of the current window). The exact time is shown in the rate-limit error.
+2. For future runs, stick to the default 3-section depth unless the topic really warrants more. Say **do a short research on X** to hint at the smaller version.
+3. If you have Claude Max (5x or 20x), the weekly budget is much higher -- but most end users don't need to upgrade.
+4. If you think the model used Opus for any part of the run, that's ~3x the cost -- check `Documents\Paperwik-Diagnostics.log` for what actually dispatched. Research always pins Sonnet and Haiku explicitly, so this shouldn't happen; if it does, send the log to your installer.
+
+---
+
+## "The research output file didn't appear in Obsidian"
+
+**Why**: the file is written to `C:\Users\<you>\Paperwik\Vault\Inbox\` with a dad-readable name like `Cognitive Health Strategies - 2026-04-24.md`. Obsidian's file tree should refresh automatically, but OneDrive Files On-Demand can cause a delay.
+
+**Fix**:
+1. In Obsidian, click the refresh icon in the file explorer pane, OR close and reopen the vault (File -> Open Vault).
+2. If the file still doesn't appear, open File Explorer directly to `C:\Users\<you>\Paperwik\Vault\Inbox\` and confirm the file exists there.
+3. If the file doesn't exist anywhere, check the diagnostic log -- the run may have failed at the Sanitizer's format-contract validation (YAML frontmatter + H2/H3 + Sources table). That's an intentional block to prevent malformed docs polluting your wiki; re-run the research to try again.
+
+---
+
 ## "Where is my chat history?"
 
 Every response you get is mirrored to a per-session JSONL file at `C:\Users\<you>\Paperwik\.claude\chat-history\<session-id>.jsonl`. That's inside the system-root `.claude/` folder, not inside `Vault/`, so Obsidian doesn't surface it -- intentional. You can still ask "what did we discuss about X?" and Paperwik reads its own archive.

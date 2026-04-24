@@ -28,6 +28,55 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.4.0 -- adds the `research` skill: a Claude-Code-native 4-phase
+    deep-research engine (PLANNER -> SEARCHER -> parallel SECTION WRITERS
+    -> EDITOR + SANITIZER) that drops synthesis docs into Vault/Inbox/
+    for the existing ingest flow to absorb. Ports the CoWork infrastructure
+    team's just-built equivalent with paperwik-specific adaptations:
+    hybrid model routing (Sonnet for synthesis, Haiku for retrieval +
+    LLM-judge classification), explicit `model:` pinning in every Task
+    call (no parent inheritance -- Opus 4.7 is now in the Pro picker),
+    default 3 section writers (stays inside one 5-hour prompt window),
+    up-front cost/time confirmation gate, one-time sentinel-guarded
+    model-routing advisory, Windows wake-lock wrapper (powercfg), and
+    dad-readable filename slugs ("Cognitive Health Strategies - 2026-04-24.md"
+    not deep_research_cognitivehe_2026-04-24.md).
+
+    Changes from v0.3.1:
+      - NEW skill: skills/research/ (SKILL.md + 5 references/*.md).
+      - NEW scripts: chunk_text.py, sanitizer.py, output_validator.py
+        (ported verbatim from CoWork) + wake_lock.py + slug_from_topic.py
+        (paperwik-only).
+      - NEW hooks: hooks/subagent_start.py (observability-only) and
+        hooks/subagent_stop.py (filesystem-sentinel pattern for the
+        bug #7881 workaround; includes 500ms settle delay to prevent
+        ready_to_stitch firing on in-flight writes).
+      - NEW template: templates/paperwik/.claude/settings.local.json.
+        Registers the SubagentStart + SubagentStop hooks at vault level
+        (NOT plugin.json) per bug #10412.
+      - install.ps1 step 7(c4): NEW merge-not-overwrite step for
+        settings.local.json. Reads existing JSON, surgically inserts
+        the two hook stanzas, preserves everything else (user permission
+        approvals, other user-added hooks). ConvertTo-Json -Depth 10
+        + UTF-8 no-BOM encoding (PS 5.1 defaults truncate and break
+        downstream readers).
+      - CLAUDE.md template gains a 5-line pointer to the research skill.
+      - paperwik-help/references/how-to.md and troubleshooting.md gain
+        research-specific sections (how to run, common failure modes).
+      - README.md: research-skill callout added. Also fixed stale
+        "dontAsk + narrow allow list" language at lines 68 + 99 (actual
+        shipped state has been bypassPermissions + Bash(*) allow since
+        v0.2.6).
+      - plugin.json + marketplace.json bumped 0.3.1 -> 0.4.0.
+      - decisions.md gains 9 new entries (4 mirroring CoWork #304-307,
+        5 paperwik-specific: hybrid routing, explicit model pinning,
+        default 3 writers, cost gate + advisory, open-Q resolutions).
+
+    Architecture reference: the handoff doc at
+    handoff_deep_research_from_cowork.md (ingested to KB as doc_id 1029)
+    is the self-contained spec for the 4-phase pipeline. The paperwik
+    port tracks its own action items at IDs 408-444.
+
     v0.3.1 -- hotfix. Ships scripts/make_docx.sh that was silently
     excluded from v0.3.0 by the repo's .gitignore (build/ is matched
     against Python build artifacts). Moved the script to scripts/
@@ -1342,6 +1391,95 @@ if ((Test-Path $vaultRoot) -and (-not (Test-Path $vaultGit))) {
         }
     } else {
         Write-Host "      git not on PATH — skipping vault git init. Auto-Commit hook won't snapshot." -ForegroundColor Yellow
+    }
+}
+
+# --- (c4) Merge SubagentStart/SubagentStop hooks into vault settings.local.json ----
+# v0.4.0 adds a research skill that spawns parallel Task subagents and needs
+# SubagentStop hooks to know when all section drafts are in. Per Claude Code
+# bug #10412, Stop-style hooks registered via plugin.json silently fail; they
+# MUST live in the vault's .claude/settings.local.json directly.
+#
+# settings.local.json is auto-populated by Claude Code with user-specific
+# permission approvals and possibly user-added hooks -- so we CANNOT
+# Copy-Item overwrite it (that's how step c2 handles settings.json, which
+# is different: c2's target is fully template-controlled; c4's target is
+# user-shared). Instead, we read existing JSON, surgically insert/update
+# ONLY hooks.SubagentStart and hooks.SubagentStop arrays, preserve all
+# other keys (permissions, env, other hook matchers), and write back with
+# ConvertTo-Json -Depth 10 and UTF-8 encoding (PS 5.1 defaults to Depth 2
+# which would truncate nested hook arrays, and UTF-16 LE which would
+# break downstream readers).
+$vaultHooksSettings = Join-Path $vaultRoot ".claude\settings.local.json"
+if (Test-Path $vaultRoot) {
+    try {
+        # Build the two hook stanzas we need to inject
+        $subagentStartStanza = [PSCustomObject]@{
+            matcher = 'general-purpose'
+            hooks = @(
+                [PSCustomObject]@{
+                    type = 'command'
+                    command = 'uv run "${CLAUDE_PLUGIN_ROOT}/hooks/subagent_start.py"'
+                    timeout = 2
+                }
+            )
+        }
+        $subagentStopStanza = [PSCustomObject]@{
+            matcher = 'general-purpose'
+            hooks = @(
+                [PSCustomObject]@{
+                    type = 'command'
+                    command = 'uv run "${CLAUDE_PLUGIN_ROOT}/hooks/subagent_stop.py"'
+                    timeout = 3
+                }
+            )
+        }
+
+        # Load existing settings.local.json if it exists + is valid JSON
+        $vaultClaudeDir = Split-Path -Parent $vaultHooksSettings
+        if (-not (Test-Path $vaultClaudeDir)) {
+            New-Item -ItemType Directory -Path $vaultClaudeDir -Force | Out-Null
+        }
+
+        $existing = [PSCustomObject]@{}
+        if (Test-Path $vaultHooksSettings) {
+            try {
+                $raw = Get-Content $vaultHooksSettings -Raw -ErrorAction SilentlyContinue
+                if ($raw -and $raw.Trim()) {
+                    $parsed = $raw | ConvertFrom-Json -ErrorAction Stop
+                    if ($parsed -is [PSCustomObject]) {
+                        $existing = $parsed
+                    }
+                }
+            } catch {
+                Write-Host "      Existing settings.local.json wasn't valid JSON; replacing." -ForegroundColor Yellow
+            }
+            # Back up the existing file (timestamped) before we touch it
+            $backup = "$vaultHooksSettings.bak-$(Get-Date -Format 'yyyyMMddHHmmss')"
+            Copy-Item $vaultHooksSettings $backup -Force
+        }
+
+        # Ensure .hooks object exists on the root
+        if (-not $existing.PSObject.Properties['hooks']) {
+            $existing | Add-Member -NotePropertyName 'hooks' -NotePropertyValue ([PSCustomObject]@{}) -Force
+        }
+
+        # Replace/insert SubagentStart + SubagentStop entries.
+        # We overwrite these specific keys (the paperwik-registered hooks are
+        # the authoritative version) but leave any other hook matchers
+        # (PreToolUse, PostToolUse, SessionStart, etc.) untouched.
+        $existing.hooks | Add-Member -NotePropertyName 'SubagentStart' -NotePropertyValue (,$subagentStartStanza) -Force
+        $existing.hooks | Add-Member -NotePropertyName 'SubagentStop'  -NotePropertyValue (,$subagentStopStanza)  -Force
+
+        # Write with Depth 10 (preserves the nested hooks[].hooks[] arrays)
+        # and UTF-8 no-BOM encoding (PS 5.1's default UTF-16 LE breaks downstream
+        # JSON parsers; Claude Code reads these as UTF-8).
+        $json = $existing | ConvertTo-Json -Depth 10
+        [System.IO.File]::WriteAllText($vaultHooksSettings, $json, (New-Object System.Text.UTF8Encoding $false))
+
+        Write-Host "      Merged SubagentStart/SubagentStop hooks into vault settings.local.json (research skill)." -ForegroundColor Green
+    } catch {
+        Write-Host "      Couldn't merge research hooks into settings.local.json: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
 

@@ -4,10 +4,11 @@ Paperwik turns your Claude Pro or Claude Max subscription into a personal resear
 
 You read your wiki in **Obsidian** (a beautiful free note-taking app that the installer set up for you). You talk to Claude in **Claude Desktop** -- specifically the **Code tab**, where Paperwik lives as a plugin.
 
-## What Paperwik can do (as of v0.3.0)
+## What Paperwik can do (as of v0.4.0)
 
 - **Ingest** -- drop any readable file into `Vault/Inbox/` and say "ingest this." Claude reads it, decides which project folder it belongs in, and writes summary + entity pages inside `Vault/Projects/<Project>/`.
 - **Search** -- ask a plain-English question. Paperwik runs hybrid retrieval (keyword + semantic + entity graph + cross-encoder reranking) across your entire wiki and answers with citations.
+- **Deep research** -- say "research cognitive health thoroughly" (any topic) and Paperwik runs a 4-phase research pipeline using Claude's built-in web tools. Takes ~10 minutes. Drops a 3,000-8,000 word cited synthesis into `Vault/Inbox/` for the normal ingest flow to absorb. Shows a cost/time estimate up front -- you say "yes" to proceed or "no" to cancel. No external API keys required.
 - **Auto-link** -- every new page automatically cross-references existing entity pages. A second mention of "Andrej Karpathy" updates his existing page instead of creating a duplicate.
 - **Auto-save** -- every file Claude writes is snapshot to a local git history behind the scenes. You can undo any change at any time by saying "undo that."
 - **Auto-archive your chats** -- every conversation you have with Paperwik is mirrored to disk so you can ask months later, "what did we decide about X?" and Claude can read its own previous sessions.
@@ -20,7 +21,7 @@ You read your wiki in **Obsidian** (a beautiful free note-taking app that the in
 - It doesn't ingest content behind a login (paywalled articles, private Notion, private Google Docs). Give it files or public URLs.
 - It doesn't edit your existing notes -- only adds new pages or appends to entity pages.
 - It doesn't sync across devices. Your vault lives on this PC. Use OneDrive or Google Drive if you want backup.
-- It doesn't run on macOS or Linux in v0.3.0 -- Windows 10/11 only.
+- It doesn't run on macOS or Linux in v0.4.0 -- Windows 10/11 only.
 - It doesn't send your markdown files anywhere. Claude reads them in memory during each session; the files themselves stay on your disk.
 
 ## Where things live

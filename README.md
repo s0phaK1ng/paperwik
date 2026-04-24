@@ -10,7 +10,7 @@ An AI helper that quietly keeps your notes organized for you.
 
 Paperwik turns a capable AI agent into a personal research and journaling archivist. You drop sources in; it reads, summarizes, cross-links, and keeps a growing markdown wiki in your Obsidian vault.
 
-- Drop PDFs, articles, or Gemini Deep Research exports into an `_Inbox/` folder.
+- Drop PDFs, articles, or Gemini Deep Research exports into an `Inbox/` folder (under the vault).
 - Say "ingest this."
 - The agent reads, summarizes, routes to a topical folder (auto-created if needed), pulls out the people and ideas worth tracking, and weaves everything into your wiki.
 - You read and browse in Obsidian — graph view, backlinks, Dataview queries.
@@ -65,7 +65,8 @@ If you want to write an adapter, open an issue — happy to collaborate.
 - **Hybrid retrieval** — SQLite + `sqlite-vec` + FTS5 + `fastembed` + `FlashRank` + spaCy, all toggleable via `retrieval_config.json`.
 - **Entity graph** — PERSON / CONCEPT / PAPER / ORGANIZATION extracted at ingest, stored in SQLite.
 - **Compaction-resilient memory** — PreCompact + SessionStart(compact) hook pair writes salient state to disk before Claude's auto-compression and re-hydrates after.
-- **YOLO-safe permissions** — `defaultMode: dontAsk` + narrow allow list + a PowerShell `PreToolUse` governor that blocks path traversal, compound shell, and unsafe git. Zero approval prompts during routine use.
+- **YOLO-safe permissions** — `defaultMode: bypassPermissions` + a broad `Bash(*)` allow list + a PowerShell `PreToolUse` governor that blocks path traversal, compound shell, and unsafe git, plus a destructive-op deny list (rm -rf, git push --force, etc.). Zero approval prompts during routine use, without a wide-open security posture.
+- **Deep research, in-session** — a 4-phase `research` skill (PLANNER → SEARCHER → parallel SECTION WRITERS → EDITOR) that uses only Claude Code native primitives (WebSearch, WebFetch, Task subagents). Drops a 3-8K word synthesis document into Vault/Inbox/ for the existing ingest flow to absorb. Pro-tier aware: Sonnet for synthesis, Haiku for retrieval, default 3 sections, up-front cost/time confirmation gate.
 - **Silent Git autosave** — every file mutation committed invisibly, enabling a conversational `revert-state` skill for "undo that."
 - **Weekly retrieval eval** — 20-question NDCG@10/MRR/Recall@5 harness against a user-authored question set, alerts on 0.05 WoW drop.
 - **True redaction** — `git filter-repo`-backed skill with four-gate safety (dry-run → explicit confirm phrase → second gate on >20 files → wiki-name typed confirmation). Writes tombstones to prevent reconstruction.
@@ -96,7 +97,7 @@ Karpathy's gist describes the **pattern** at an idea level. It explicitly invite
 | No structured entity extraction | PERSON / CONCEPT / PAPER / ORGANIZATION graph built at ingest and stored in SQLite | Deep Research reports are entity-dense; cross-report queries ("which researchers appear across multiple reports?") fail on vector search alone |
 | No compaction-resilience pattern | `PreCompact` + `SessionStart(compact)` hook pair writes durable state before auto-compaction and restores after | Measured data from a related project showed rule compliance drops from ~75% to ~25% post-compaction without this pattern. For long sessions, it's the difference between a helpful archivist and an amnesiac one |
 | No measurement discipline | 20-question retrieval eval harness running weekly against a user-authored question set, alerts on 5% WoW NDCG@10 drop | Retrieval quality silently degrades as wikis grow. Without measurement, you notice only when it's frustrating. By then it's hard to diagnose |
-| No explicit threat model | `defaultMode: "dontAsk"` + narrow allow list + a `PreToolUse` governor that enforces path boundary, safe-git subset, and compound-command blocking | Zero approval prompts during routine use, without a wide-open security posture. A redacted topic can't be reconstructed even if stray references survive |
+| No explicit threat model | `defaultMode: "bypassPermissions"` + broad `Bash(*)` allow + destructive-op deny + a `PreToolUse` governor that enforces path boundary, safe-git subset, and compound-command blocking | Zero approval prompts during routine use, without a wide-open security posture. A redacted topic can't be reconstructed even if stray references survive |
 | No redaction mechanism (plain delete retains Git history) | `redact-history` skill backed by `git-filter-repo`, four-gate safety flow, tombstones to prevent agentic reconstruction | Real privacy requires truly erasing things, not just deleting the current file. Four gates because it's irreversible |
 
 ### A note on the relationship

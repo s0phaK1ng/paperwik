@@ -12,7 +12,7 @@ Each entry follows the format:
 ## [YYYY-MM-DD HH:MM] <operation> | <short description>
 ```
 
-Where `<operation>` is one of: `ingest`, `query-to-page`, `lint`, `update`, `redact`, `session-summary`.
+Where `<operation>` is one of: `ingest`, `research`, `query-to-page`, `lint`, `update`, `redact`, `session-summary`.
 
 ---
 

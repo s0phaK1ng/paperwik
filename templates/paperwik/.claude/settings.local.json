@@ -1,0 +1,29 @@
+{
+  "$comment": "Vault-level settings for the Paperwik vault. This file holds user-specific overrides (auto-populated permission approvals, user-added hooks) and paperwik-registered Stop-style hooks that can't live in plugin.json per Claude Code bug #10412. The installer (install.ps1 step c4) merges the SubagentStart + SubagentStop stanzas below into whatever this file already contains at install time, preserving all other keys. Never overwrite this file wholesale — user permission entries accumulate here over time.",
+  "hooks": {
+    "SubagentStart": [
+      {
+        "matcher": "general-purpose",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run \"${CLAUDE_PLUGIN_ROOT}/hooks/subagent_start.py\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "general-purpose",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run \"${CLAUDE_PLUGIN_ROOT}/hooks/subagent_stop.py\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

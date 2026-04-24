@@ -67,7 +67,7 @@ Do NOT assume the scripts are at `~/Paperwik/scripts/` — that path does not
 exist. Do NOT fall back to manual curation if you can't find the scripts at
 first glance; the correct path above is always present on a standard install.
 
-## The three operations
+## The four operations
 
 ### Ingest (user drops content into `Vault/Inbox/` and says "ingest this")
 
@@ -99,6 +99,13 @@ Scan for: contradictions between pages, stale claims superseded by newer
 sources, orphan pages with no inbound links, entities mentioned but missing
 a page. Report findings; make fixes on request.
 
+### Research (user says "research X thoroughly")
+
+Invoke the `research` skill. It's a ~10-min 4-phase pipeline that produces
+a cited long-form synthesis dropped into `Vault/Inbox/`. Always show the
+cost/time confirmation before engaging. Do NOT invoke for short factual
+questions -- those are Query, not Research.
+
 ## Memory discipline
 
 - **Recent working memory** is at `.claude/skills/state/active_context.md`.
@@ -115,24 +122,11 @@ The following happen automatically in the background on every turn. The
 user never needs to ask. These are hook-driven — not skill-driven — so
 they fire reliably without any prompt routing:
 
-- **`PostToolUse` → `Auto-Commit.ps1`**: after any Write/Edit/MultiEdit/
-  NotebookEdit, runs `git add -A && git commit` inside `~/Paperwik/`. Gives
-  the user an Undo capability (git log / git revert). Initializes the
-  repo on first run if it doesn't exist. Silent.
-- **`Stop` → `Chat-Archive.ps1`**: after every assistant response, (a)
-  mirrors the full session transcript into
-  `~/Paperwik/.claude/chat-history/<session-id>.jsonl` so the complete
-  chat is always on disk in the vault; (b) scans the turn's user + assistant
-  text for decision-making language and silently appends matches to
-  `~/Paperwik/decisions.md`. Never prompts. Never asks "want me to log this?"
-- **`Stop` → `Rotate-Memory.ps1`**: rotates older sections of
-  `active_context.md` into `archived_index.md` when the active context
-  exceeds a size threshold. Silent.
-- **`PreCompact` → `Save-State.ps1`**: before Claude Code compacts the
-  context window, captures current state so it survives compaction.
-- **`SessionStart` (startup/resume/clear)** → `Rehydrate-Memory.ps1`:
-  re-reads `active_context.md` so you pick up where the prior session
-  left off.
+- **`PostToolUse` → `Auto-Commit.ps1`**: `git add -A && git commit` inside `~/Paperwik/` after every Write/Edit. Gives the user `git revert` as undo. Silent.
+- **`Stop` → `Chat-Archive.ps1`**: mirrors the transcript to `.claude/chat-history/<session-id>.jsonl`, and scans for decision language to append matches to `decisions.md`. Never prompts.
+- **`Stop` → `Rotate-Memory.ps1`**: when `active_context.md` exceeds its threshold, rotates older sections into `archived_index.md`. Silent.
+- **`PreCompact` → `Save-State.ps1`**: captures state before auto-compaction so it survives.
+- **`SessionStart` (startup/resume/clear)** → `Rehydrate-Memory.ps1`: re-reads `active_context.md` so you pick up where the prior session left off.
 
 **Design intent**: the user should never have to say "file this" or
 "remember that." The system captures everything silently; the user asks
@@ -192,6 +186,7 @@ quote. Style: five sentences or fewer, non-technical, specific next action.
   No system clutter.
 - Drops sources into `Inbox/`, says "ingest this," watches Projects/ fill
   with topical folders + entity pages.
+- Says "research X thoroughly," gets a cited 3-5K word writeup dropped in `Inbox/`.
 - Asks questions, gets cited answers.
 - Says "undo that," gets the previous version back.
 - Says "scrub X from my wiki," gets irreversible purge with two-step
