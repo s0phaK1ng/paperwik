@@ -40,7 +40,9 @@ want to ask your wiki."*
 ### 2. Run the eval
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/retrieval_eval.py"
+# $CLAUDE_PLUGIN_ROOT is not reliably exported to skill shells; fall back to install path
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+uv run "$PAPERWIK_PLUGIN/scripts/retrieval_eval.py"
 ```
 
 The script prints a one-line summary to stdout (NDCG@10, MRR, Recall@5) and

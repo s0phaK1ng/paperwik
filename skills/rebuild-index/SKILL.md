@@ -69,8 +69,11 @@ user has a safety net.
 ### 3. Let the scaffolder recreate the empty schema
 
 ```bash
+# $CLAUDE_PLUGIN_ROOT is not reliably exported to skill shells; fall back to install path.
+# Reuse $PAPERWIK_PLUGIN for every command in this skill.
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
 del "%USERPROFILE%\Paperwik\.claude\.scaffolded"
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/scaffold-vault.py"
+uv run "$PAPERWIK_PLUGIN/scripts/scaffold-vault.py"
 ```
 
 This creates an empty `knowledge.db` with the full schema. The scaffolder is
@@ -84,7 +87,7 @@ Glob every `.md` file under `Paperwik/` except the special meta files
 each file, call the indexer:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/index_source.py" --source "<path>" --project "<folder name>"
+uv run "$PAPERWIK_PLUGIN/scripts/index_source.py" --source "<path>" --project "<folder name>"
 ```
 
 Report progress every 50 files: *"Rebuilt X of Y files, Z chunks indexed so
@@ -96,11 +99,13 @@ After all chunks are indexed, compute each project's average embedding
 across its chunks and store as `centroid_embedding`:
 
 ```bash
+# Export PAPERWIK_PLUGIN so the inline Python can pick it up too
+export PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
 uv run python -c "
 from pathlib import Path
 import os, sqlite3
 import sys
-sys.path.insert(0, os.environ['CLAUDE_PLUGIN_ROOT'] + '/scripts')
+sys.path.insert(0, os.environ.get('CLAUDE_PLUGIN_ROOT', os.environ['PAPERWIK_PLUGIN']) + '/scripts')
 from embeddings import from_blob, mean_vector, to_blob
 
 db = Path(os.environ['USERPROFILE']) / 'Paperwik' / 'knowledge.db'
@@ -123,7 +128,7 @@ print('Centroids rebuilt.')
 Run a smoke query against the rebuilt DB:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/search.py" "test query from rebuild" 3
+uv run "$PAPERWIK_PLUGIN/scripts/search.py" "test query from rebuild" 3
 ```
 
 If the smoke test returns ≥1 result, delete the backup:

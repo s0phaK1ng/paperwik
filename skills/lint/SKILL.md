@@ -45,7 +45,9 @@ since they may be mid-integration.
 Query the entity graph:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/lint_entities.py"
+# $CLAUDE_PLUGIN_ROOT is not reliably exported to skill shells; fall back to install path
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+uv run "$PAPERWIK_PLUGIN/scripts/lint_entities.py"
 ```
 
 *(If `lint_entities.py` doesn't exist yet, fall back to Grep: find every

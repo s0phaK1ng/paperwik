@@ -57,7 +57,9 @@ or a content-match list (pre-resolve via `Grep`, then pass individual paths).
 Before ANY destructive action, run the script in dry-run mode:
 
 ```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_PLUGIN_ROOT}/scripts/redact-history.ps1" -TargetPattern "<pattern>" -ConfirmationToken "DRYRUN"
+# $CLAUDE_PLUGIN_ROOT is not reliably exported to skill shells; fall back to install path
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+powershell -NoProfile -ExecutionPolicy Bypass -File "$PAPERWIK_PLUGIN/scripts/redact-history.ps1" -TargetPattern "<pattern>" -ConfirmationToken "DRYRUN"
 ```
 
 The script returns `key=value` lines including `matched_files`, `matched_list`,

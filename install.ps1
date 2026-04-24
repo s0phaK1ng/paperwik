@@ -28,19 +28,35 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.2.4 — friends-and-family bootstrap. Adds explicit Desktop-restart
-    guidance to the post-install walkthrough. Discovered during v0.2.3
-    fresh-sandbox verification: on first launch after install, Claude
-    Desktop does not display the newly-registered paperwik marketplace
-    under + → Plugins → Personal. The section is missing entirely, as
-    if no user-scope marketplaces were configured. Full quit + reopen
-    of Claude Desktop (including tray icon) makes it appear. Likely
-    cause: Desktop caches plugin config at process startup and does not
-    re-scan settings.json during session lifetime — any pre-written
-    entries from an installer that ran while Desktop was open (or that
-    wrote settings.json while Desktop was initializing) require a
-    second start to surface. Not fixable from the installer side;
-    users must restart Claude once. Logged as decision #312.
+    v0.2.5 — friends-and-family bootstrap. Fixes a plugin-root path
+    resolution gap discovered during v0.2.4 end-to-end test. Every
+    user-facing SKILL.md referenced `${CLAUDE_PLUGIN_ROOT}/scripts/X.py`
+    on the assumption that Claude Code exports CLAUDE_PLUGIN_ROOT to
+    the skill's bash shell. It does not — the substitution only
+    applies to hook command strings, not to subprocesses spawned by
+    the agent's Bash tool. When the agent ran a skill, the literal
+    string `${CLAUDE_PLUGIN_ROOT}` resolved to empty, the script path
+    became `/scripts/X.py`, `uv run` failed, and the agent fell back
+    to manual curation (no DB indexing). Verified in the ingest of a
+    .docx source: the agent wrote summary + entity pages correctly
+    but skipped knowledge.db entirely.
+
+    Changes from v0.2.4:
+      - All user-facing SKILL.md files (ingest, lint, redact,
+        rebuild-index, measure-retrieval) now use a bash fallback
+        pattern at the top of each invocation:
+            PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+            uv run "$PAPERWIK_PLUGIN/scripts/X.py"
+        Works whether or not Claude Code exposes the env var.
+      - CLAUDE.md template gains a "Plugin files location" section
+        that tells the agent exactly where the Python scripts live
+        (`$HOME/.claude/plugins/marketplaces/paperwik/scripts/`) and
+        warns against searching for them under `~/Paperwik/scripts/`
+        (which does not exist on a standard install).
+      - plugin.json + marketplace.json versions bumped 0.2.0 -> 0.2.5
+        so Claude Code sees this as a new version to re-fetch.
+      - No code changes in install.ps1 itself. Shipping v0.2.5 so
+        existing users reinstalling pick up the new plugin content.
 
     Changes from v0.2.3:
       - Final-message step 2 now warns: "If Claude was already open

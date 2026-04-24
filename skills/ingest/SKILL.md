@@ -75,10 +75,17 @@ reading and extraction. Prompt it to:
 ### 3. Route the source to the correct project folder
 
 Before writing anything, determine the target project folder via the
-project router:
+project router. The plugin's Python scripts live inside Claude Code's
+plugin cache — on Windows that's
+`$HOME/.claude/plugins/marketplaces/paperwik/scripts/` (equivalently
+`$USERPROFILE\.claude\plugins\marketplaces\paperwik\scripts\`).
+`$CLAUDE_PLUGIN_ROOT` is set for some Claude Code hook contexts but
+is NOT reliably exported to the skill's bash shell — use the explicit
+path or the fallback pattern below:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/project_router.py" "$INBOX_FILE"
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+uv run "$PAPERWIK_PLUGIN/scripts/project_router.py" "$INBOX_FILE"
 ```
 
 The router returns JSON with `project_name`, `project_id`, `is_new`, and
@@ -108,15 +115,18 @@ For each entity the subagent identified:
 ### 6. Hand off to the indexer
 
 Run the indexer script to chunk the source, embed via fastembed, extract
-entities into the graph, and persist to `knowledge.db`:
+entities into the graph, and persist to `knowledge.db`. Use the same
+`$PAPERWIK_PLUGIN` resolution pattern as step 3:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/index_source.py" --source "<path>" --project "<project_name>"
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+uv run "$PAPERWIK_PLUGIN/scripts/index_source.py" --source "<path>" --project "<project_name>"
 ```
 
 *(If `index_source.py` does not yet exist, call `scripts/graph.py` directly
 with the source text chunks and let it populate the entity tables. The
-chunks + embeddings will be handled by search.py when it runs queries.)*
+chunks + embeddings will be handled by `$PAPERWIK_PLUGIN/scripts/search.py`
+when it runs queries.)*
 
 ### 7. Update `index.md` and `log.md`
 

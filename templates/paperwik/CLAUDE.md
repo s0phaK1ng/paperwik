@@ -37,6 +37,36 @@ but the user only sees `Vault/`. Anything you write that's intended for the
 user to read goes inside `Vault/`. Anything internal (logs, DB, agent state)
 stays at the system root.
 
+## Plugin files location (the bundled Python scripts)
+
+The Paperwik plugin's Python scripts (router, indexer, search, reranker,
+entity graph, eval harness) are NOT in `~/Paperwik/`. They live in Claude
+Code's plugin cache:
+
+```
+$HOME/.claude/plugins/marketplaces/paperwik/
+    scripts/         ← project_router.py, index_source.py, search.py,
+                       embeddings.py, reranker.py, graph.py, scaffold-vault.py,
+                       retrieval_eval.py, setup-models.py, redact-history.ps1
+    skills/          ← SKILL.md files (loaded by Claude Code, not read directly)
+    hooks/           ← lifecycle hooks (invoked by Claude Code)
+    templates/       ← the template tree used by scaffold-vault.py
+```
+
+When a skill tells you to run `uv run "${CLAUDE_PLUGIN_ROOT}/scripts/X.py"`,
+note that `$CLAUDE_PLUGIN_ROOT` is set for hook contexts but is NOT
+reliably exported to skill bash shells. Use this pattern at the top of
+any bash command that needs a plugin script:
+
+```bash
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+uv run "$PAPERWIK_PLUGIN/scripts/<script_name>.py" <args>
+```
+
+Do NOT assume the scripts are at `~/Paperwik/scripts/` — that path does not
+exist. Do NOT fall back to manual curation if you can't find the scripts at
+first glance; the correct path above is always present on a standard install.
+
 ## The three operations
 
 ### Ingest (user drops content into `Vault/Inbox/` and says "ingest this")
