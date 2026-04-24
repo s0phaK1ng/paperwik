@@ -1,0 +1,15 @@
+/* ==========================================================================
+   User customizations — edit freely; never overwritten by paperwik upgrades.
+
+   Paperwik ships paperwik.css as immutable core brand styling (refreshed on
+   every install/upgrade). This file, user-custom.css, is initialized empty
+   and is never touched by the installer. Put any personal CSS tweaks here.
+
+   To take effect, enable this snippet in Obsidian:
+     Settings -> Appearance -> CSS Snippets -> toggle "user-custom" on
+
+   Examples of things you might add here:
+     - Your own preferred font-family or font-size
+     - Folder-specific colors beyond paperwik's defaults
+     - Workspace accent tint matching your hardware or mood
+   ========================================================================== */

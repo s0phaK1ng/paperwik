@@ -4,7 +4,7 @@ Paperwik turns your Claude Pro or Claude Max subscription into a personal resear
 
 You read your wiki in **Obsidian** (a beautiful free note-taking app that the installer set up for you). You talk to Claude in **Claude Desktop** -- specifically the **Code tab**, where Paperwik lives as a plugin.
 
-## What Paperwik can do (as of v0.4.0)
+## What Paperwik can do (as of v0.5.0)
 
 - **Ingest** -- two equivalent paths. (a) Drag a readable file into Claude Desktop's chat bar and say "ingest this" (easiest, what most users do). (b) Drop one or more files into `Vault/Inbox/` and say "ingest my Inbox" (better for batches or Obsidian-native workflow). Claude reads, decides which project folder it belongs in, and writes summary + entity pages inside `Vault/Projects/<Project>/`.
 - **Search** -- ask a plain-English question. Paperwik runs hybrid retrieval (keyword + semantic + entity graph + cross-encoder reranking) across your entire wiki and answers with citations.
@@ -16,12 +16,23 @@ You read your wiki in **Obsidian** (a beautiful free note-taking app that the in
 - **Lint** -- ask for a health check and Paperwik surfaces orphan pages, entities that deserve their own page, contradictions between sources, and projects that have gone quiet.
 - **Redact** -- ask Paperwik to "scrub X from my wiki" and it does a two-step-confirmed permanent removal from both files and git history.
 
+## Obsidian polish (as of v0.5.0)
+
+When you open Obsidian, you'll see a paperwik-branded layout that the installer sets up for you on first run:
+
+- **File Explorer on the left** with the Inbox folder tinted gold so it's the obvious "drop zone."
+- **Welcome.md in reading view** in the center — press **Alt+H** any time to come back to it.
+- **Local Graph + Recent Files on the right** — Local Graph shows the notes neighboring whichever page you're reading; Recent Files gives you chronological access to anything you've touched lately.
+- **Color-coded full Graph view** (press **Ctrl+G** to toggle) — Inbox nodes are gold, Entities (people, concepts, papers) teal, Project summaries slate blue, archival sources muted grey. Administrative system files are filtered out so the graph shows real knowledge relationships, not bookkeeping.
+- **Six community plugins pre-installed**: Dataview (dynamic tables), Marp (slide decks), Hover Editor (floating previews), Recent Files, Better Search Views, Image Toolkit.
+- **Obsidian Web Clipper integration** — if you install the [Web Clipper browser extension](https://obsidian.md/clipper) and import `~/Paperwik/web-clipper-import.json` via its Settings → Import, any web article you clip lands straight in your Inbox for Paperwik to ingest.
+
 ## What Paperwik doesn't do
 
 - It doesn't ingest content behind a login (paywalled articles, private Notion, private Google Docs). Give it files or public URLs.
 - It doesn't edit your existing notes -- only adds new pages or appends to entity pages.
 - It doesn't sync across devices. Your vault lives on this PC. Use OneDrive or Google Drive if you want backup.
-- It doesn't run on macOS or Linux in v0.4.0 -- Windows 10/11 only.
+- It doesn't run on macOS or Linux in v0.5.0 -- Windows 10/11 only.
 - It doesn't send your markdown files anywhere. Claude reads them in memory during each session; the files themselves stay on your disk.
 
 ## Where things live

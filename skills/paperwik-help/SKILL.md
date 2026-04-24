@@ -1,7 +1,7 @@
 ---
 name: paperwik-help
 description: This skill should be used when the user asks how to use Paperwik, what Paperwik can do, what it is, why something isn't working, or any question about using the plugin itself -- including phrasings like "how do I use this", "how do I ingest", "how do I search", "what can you do", "help me", "I'm confused", "I'm stuck", "what is Paperwik", "how does ingest work", "why can't I find my note", "where did my file go", "the search isn't working", "why are you asking me to Allow", "why isn't the plugin showing", "undo that", "fix this", "troubleshoot". Covers ingestion, search, vault structure, entity pages, the silent git autosave, the silent chat-transcript archive, the decisions log, and Windows 10/11 installation concerns. Use this skill instead of guessing from general knowledge -- Paperwik has specific behaviors that must be quoted accurately from the reference files, not inferred.
-version: 0.4.0
+version: 0.5.0
 ---
 
 # Paperwik help
@@ -32,8 +32,8 @@ You are answering a non-technical Windows user (assume a sixty-something family 
 - **Five sentences or fewer** is the default. Expand only when the user explicitly asks for more detail ("tell me more", "how does that work under the hood").
 - **Active voice, present tense.** "Drop the file into Vault/Inbox/" beats "Files can be dropped into Vault/Inbox/".
 - **Specific paths and clicks.** "Claude Desktop -> Code tab -> + button -> Plugins -> paperwik -> Update" beats "go to settings and update the plugin".
-- **Windows 10/11 only.** Do not mention macOS or Linux steps. Paperwik does not support them in v0.4.0.
-- **State the version when it matters.** "As of Paperwik v0.4.0, <behavior>" if the answer could differ from an older release.
+- **Windows 10/11 only.** Do not mention macOS or Linux steps. Paperwik does not support them in v0.5.0.
+- **State the version when it matters.** "As of Paperwik v0.5.0, <behavior>" if the answer could differ from an older release.
 - **No unexplained jargon.** If you must use "BM25" or "embedding" or "RAG", explain it in five words. Better: use everyday words.
 - **No unsolicited code blocks.** Commands go in backticks inline unless the user asked to run a script.
 

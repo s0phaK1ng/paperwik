@@ -1,0 +1,41 @@
+{
+  "$comment": "Paperwik build-time sidecar manifest. Read by install.ps1 step (c5) to download Obsidian community plugin binaries from GitHub Releases. NOT an Obsidian config file — paperwik-specific. Never copied to user vault. Format: each entry has the Obsidian plugin id (what goes in community-plugins.json), the GitHub owner/repo (to query Releases API), and any plugin-specific notes.",
+  "plugins": [
+    {
+      "id": "dataview",
+      "repo": "blacksmithgu/obsidian-dataview",
+      "assets": ["main.js", "manifest.json", "styles.css"],
+      "note": "Primary query engine for paperwik's index.md dashboards. Security-hardened via data.json seed (enableDataviewJs: false)."
+    },
+    {
+      "id": "marp-slides",
+      "repo": "MSzturc/marp-slides",
+      "assets": ["main.js", "manifest.json", "styles.css"],
+      "note": "Slide deck rendering from markdown. Passive render layer — no auto-write risk."
+    },
+    {
+      "id": "obsidian-hover-editor",
+      "repo": "nothingislost/obsidian-hover-editor",
+      "assets": ["main.js", "manifest.json", "styles.css"],
+      "note": "Floating page previews prevent spatial disorientation in dense entity graphs."
+    },
+    {
+      "id": "recent-files-obsidian",
+      "repo": "tgrosinger/recent-files-obsidian",
+      "assets": ["main.js", "manifest.json"],
+      "note": "Chronological anchor. No styles.css in release assets as of 2026-04."
+    },
+    {
+      "id": "obsidian-better-search-views",
+      "repo": "ivan-lednev/better-search-views",
+      "assets": ["main.js", "manifest.json", "styles.css"],
+      "note": "Outliner-style context trees for global search + backlinks."
+    },
+    {
+      "id": "obsidian-image-toolkit",
+      "repo": "sissilab/obsidian-image-toolkit",
+      "assets": ["main.js", "manifest.json", "styles.css"],
+      "note": "Click-zoom-pan for embedded images. Intercepts click events only; no markdown rewriting."
+    }
+  ]
+}

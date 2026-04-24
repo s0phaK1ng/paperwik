@@ -1,0 +1,39 @@
+{
+  "collapse-filter": false,
+  "search": "-path:\"CLAUDE.md\" -path:\"index.md\" -path:\"log.md\" -path:\"Welcome.md\"",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:Inbox/",
+      "color": {
+        "a": 1,
+        "rgb": 16491812
+      }
+    },
+    {
+      "query": "path:Entities/",
+      "color": {
+        "a": 1,
+        "rgb": 1359030
+      }
+    },
+    {
+      "query": "path:_sources/",
+      "color": {
+        "a": 0.6,
+        "rgb": 7040887
+      }
+    },
+    {
+      "query": "path:Projects/ -path:Entities/ -path:_sources/",
+      "color": {
+        "a": 1,
+        "rgb": 4669782
+      }
+    }
+  ]
+}

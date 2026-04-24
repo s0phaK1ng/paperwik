@@ -1,0 +1,11 @@
+{
+  "$comment": "Paperwik v0.5.0 Dataview seed. Key names verified against blacksmithgu/obsidian-dataview src/settings.ts (2026-04-24). CRITICAL SECURITY: enableDataviewJs + enableInlineDataviewJs MUST stay false — closes XSS/RCE vector from LLM-laundered web content (cf. Elastic Security Labs PhantomPulse RAT 2026).",
+  "refreshInterval": 2500,
+  "renderNullAs": "-",
+  "taskCompletionTracking": false,
+  "enableDataviewJs": false,
+  "enableInlineDataviewJs": false,
+  "prettyRenderInlineFields": true,
+  "tableIdColumnName": "File",
+  "tableGroupColumnName": "Group"
+}

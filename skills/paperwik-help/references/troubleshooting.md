@@ -157,6 +157,36 @@ If you don't know which project Paperwik filed it under, ask: **"which project d
 
 ---
 
+## "The graph view looks wrong -- everything's collapsed into one blob"
+
+**Why it can happen**: Obsidian may have cached an older `graph.json` that doesn't have paperwik's system-file filter, OR the filter text was edited by accident.
+
+**Fix**:
+1. Open Obsidian -> click the Graph View icon -> click the **settings gear**. Verify the Filters box contains: `-path:"CLAUDE.md" -path:"index.md" -path:"log.md" -path:"Welcome.md"`.
+2. If that filter is missing, click **Reset to default** -> close Obsidian -> re-run the installer one-liner (`irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex`). The installer refreshes the graph.json template.
+3. If colors are also wrong, Settings -> Appearance -> CSS Snippets -> verify **paperwik** is toggled on.
+
+## "Hotkeys aren't working (Alt+H/Alt+I/Ctrl+G do nothing)"
+
+**Why**: Obsidian only processes hotkeys when a pane has keyboard focus. If you just opened a note from File Explorer, click into the note body first so Obsidian knows which pane is "active."
+
+**Fix**:
+1. Click once inside the note text.
+2. Try the hotkey again.
+3. If still nothing: Settings -> Hotkeys -> search for "graph", "welcome", "inbox" -- verify the hotkey is still bound. The installer sets these on first install; a subsequent Obsidian reset-to-defaults would unbind them. If unbound, re-run the installer.
+
+## "Web Clipper saved my article somewhere other than the Inbox"
+
+**Why**: The Web Clipper extension hasn't imported paperwik's template yet, so it's using its own default save location.
+
+**Fix**:
+1. Click the Web Clipper icon in your browser toolbar -> gear icon -> **Settings**.
+2. Click **Import** in the settings sidebar.
+3. Pick `C:\Users\<you>\Paperwik\web-clipper-import.json` -> the paperwik Inbox template loads.
+4. Re-clip the article; it now saves to `Paperwik\Vault\Inbox\`.
+
+The previously-saved misplaced article is still on your disk -- just not in the Inbox. Drag it there from File Explorer, then say "ingest my Inbox".
+
 ## "Where is my chat history?"
 
 Every response you get is mirrored to a per-session JSONL file at `C:\Users\<you>\Paperwik\.claude\chat-history\<session-id>.jsonl`. That's inside the system-root `.claude/` folder, not inside `Vault/`, so Obsidian doesn't surface it -- intentional. You can still ask "what did we discuss about X?" and Paperwik reads its own archive.

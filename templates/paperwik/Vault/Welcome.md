@@ -84,3 +84,17 @@ sort things out.
   nothing is ever truly irreversible unless you explicitly say "scrub."
 
 Take your time. This is yours.
+
+## Quick keyboard shortcuts
+
+- **Alt+H** — come back to this Welcome page any time.
+- **Alt+I** — jump straight to the Inbox folder.
+- **Ctrl+G** — open the Graph view (see how your notes connect).
+
+## Capture web articles with one click
+
+Install the [Obsidian Web Clipper browser extension](https://obsidian.md/clipper), open its Settings → Import, and pick this file:
+
+`C:\Users\<you>\Paperwik\web-clipper-import.json`
+
+After that, clicking the extension icon on any web page saves it straight here to `Inbox/`. Then just say *"ingest my Inbox"* and your helper handles the rest.

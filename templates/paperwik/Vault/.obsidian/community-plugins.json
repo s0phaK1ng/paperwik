@@ -1,4 +1,8 @@
 [
   "dataview",
-  "marp-slides"
+  "marp-slides",
+  "obsidian-hover-editor",
+  "recent-files-obsidian",
+  "obsidian-better-search-views",
+  "obsidian-image-toolkit"
 ]

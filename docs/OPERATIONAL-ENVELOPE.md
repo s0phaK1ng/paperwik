@@ -4,7 +4,16 @@ A friendly reference sheet for the person using Paperwik. Good to keep
 handy for the first few weeks. The installer usually hands this over at
 the end of the training session.
 
-*Current as of Paperwik v0.4.0.*
+*Current as of Paperwik v0.5.0.*
+
+## Obsidian hotkey cheat sheet (v0.5.0+)
+
+- **Alt+H** — jump to Welcome.md (your home base)
+- **Alt+I** — jump to the Inbox folder (where you drop new sources)
+- **Ctrl+G** — toggle the full Graph view (color-coded by folder)
+- **Ctrl+P** — command palette (type any command)
+
+Paperwik ships with these hotkeys pre-configured. Vim mode and split-pane hotkeys are explicitly unbound — they'd trap or confuse a casual user.
 
 ---
 

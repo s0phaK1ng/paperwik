@@ -24,6 +24,32 @@ Two equivalent ways — pick whichever feels easier. Result is the same.
 
 Paste or type: **ingest this article: https://example.com/interesting-thing**. Paperwik fetches the page, saves a cleaned markdown copy into `Vault/Inbox/`, and then runs the normal ingest flow.
 
+## Use the Obsidian Web Clipper to capture web articles straight to the Inbox
+
+1. Install the Obsidian Web Clipper browser extension from [obsidian.md/clipper](https://obsidian.md/clipper) (works in Chrome, Edge, Firefox).
+2. After install, click the extension icon in your browser toolbar, open its **Settings**.
+3. Find **Import** (usually in a sidebar or hamburger menu). Click it and pick this file:
+   `C:\Users\<you>\Paperwik\web-clipper-import.json`
+4. From then on, clicking the extension icon on any web article saves a cleaned markdown copy straight into `Paperwik\Vault\Inbox\` with paperwik's YAML frontmatter (`status: uningested`, `source_type: web_article`, etc.).
+5. Back in Claude, say **"ingest my Inbox"** to process the capture.
+
+One-click from browser to vault. The agent then summarizes, cross-links, and files it like any other source.
+
+## What do the colors in the graph view mean?
+
+Press **Ctrl+G** to toggle the full graph. Nodes are color-coded by what kind of file they are:
+
+- **Gold / amber** -- files in `Inbox/`. Things recently dropped but not yet ingested.
+- **Teal / green** -- entity pages (people, concepts, papers, organizations).
+- **Slate blue** -- project summary pages (the hubs of each topical folder).
+- **Muted grey** -- files in `_sources/` (the originals after ingestion). Visually recede because you rarely reopen them.
+
+Administrative files (`index.md`, `log.md`, `CLAUDE.md`, `Welcome.md`) are filtered out so they don't pull the graph into one dense blob.
+
+## Where does research output go?
+
+When you ask Paperwik to "research X thoroughly", the final cited writeup drops into `Paperwik\Vault\Inbox\` with a dad-readable filename like "Cognitive Health Strategies - 2026-04-24.md". Say **"ingest my Inbox"** to absorb it into the wiki proper.
+
 ## Do deep research on a topic
 
 Say **research cognitive health thoroughly** (substitute any topic). Paperwik runs a 4-phase research pipeline using Claude's built-in web tools -- no external APIs or keys required. Takes ~8-12 minutes. Drops a 3,000-8,000 word synthesis with 15+ cited sources into `Vault/Inbox/`. You then say "ingest this" the same way you would for any source.

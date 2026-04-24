@@ -1,0 +1,17 @@
+{
+  "workspace:split-vertical": [],
+  "workspace:split-horizontal": [],
+  "editor:toggle-vim": [],
+  "graph:open": [
+    {
+      "modifiers": ["Mod"],
+      "key": "G"
+    }
+  ],
+  "file-explorer:reveal-active-file": [
+    {
+      "modifiers": ["Alt"],
+      "key": "I"
+    }
+  ]
+}

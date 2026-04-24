@@ -28,6 +28,69 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.5.0 -- Obsidian template rebuild. Transforms the shipped .obsidian/
+    from a 27-line stub into a complete pre-configured reading surface:
+    7 community plugins pre-downloaded + pre-enabled, a filtered +
+    color-coded graph view, a <200-line custom CSS brand snippet, a
+    minimalist hotkey scheme (Alt+H home, Alt+I Inbox, Ctrl+G graph;
+    Vim-mode + split-pane unbound), workspace.json injection that
+    bypasses OneDrive/Dropbox/GDrive conflict-copy multiplication, a
+    Web Clipper import file routing captures straight to Vault/Inbox/,
+    and a Dataview security lockdown (enableDataviewJs: false +
+    enableInlineDataviewJs: false) that closes an XSS/RCE vector
+    documented by Elastic Security Labs (PhantomPulse RAT 2026).
+
+    New files in templates/paperwik/Vault/.obsidian/:
+      app.json           -- fixed stale attachmentFolderPath (Inbox/ not _Inbox/assets)
+      graph.json         -- system-file filter + 4 color groups (Inbox/
+                            Entities/ Projects/ _sources) + no physics
+                            (Obsidian defaults)
+      hotkeys.json       -- Alt+H/Alt+I/Ctrl+G adds; Vim + split unbinds
+      workspace-default.json -- optimal first-open layout template
+      core-plugins.json  -- enable map for Obsidian core plugins
+      community-plugins.json -- 6-entry paperwik roster
+      snippets/paperwik.css -- brand overlay (<200 lines)
+      snippets/user-custom.css -- empty user-tweak surface, immutable
+                                  across upgrades
+      plugins/dataview/data.json -- security-locked Dataview seed
+
+    New paperwik build-time sidecar:
+      plugin/scripts/obsidian-plugins-manifest.json -- 6-plugin install
+                                                       manifest for the
+                                                       new installer step
+
+    install.ps1 adds 4 new steps after (c4):
+      (c5) Programmatic plugin installer -- reads the manifest, queries
+           GitHub Releases API, downloads main.js + manifest.json +
+           styles.css to ~/Paperwik/Vault/.obsidian/plugins/<id>/.
+           Idempotent: skips if target manifest.json already present.
+      (c6) Workspace injection -- Copy-Item workspace-default.json ->
+           workspace.json on first install only. Never overwrites if
+           the user already has a customized workspace.json.
+      (c7) Web Clipper import generator -- writes
+           ~/Paperwik/web-clipper-import.json for one-click import via
+           the browser extension's Settings > Import flow.
+      (c8) CSS snippet auto-enable -- appends "paperwik" to
+           appearance.json's enabledCssSnippets array. user-custom.css
+           left disabled for user opt-in.
+
+    Plugin roster decisions (paperwik v0.5.0 decision log):
+      Include 7: Dataview, Marp, Hover Editor, Recent Files,
+                 Better Search Views, Image Toolkit, Canvas (core).
+      Exclude 8: Advanced Tables (auto-format on save is #1 agent-safety
+                 risk), Various Complements (intrusive popups),
+                 Outliner (non-standard list syntax), Breadcrumbs
+                 (heavy indexing), Enhancing Export (needs Pandoc),
+                 Graph Analysis (dense UI), File Tree Alternative
+                 (UI deviation), Quick Switcher++ (unnecessary).
+
+    Security: Dataview's settings.ts schema verified via gh api before
+    shipping data.json. Confirmed key names: renderNullAs (not
+    nullValueRenderMode), enableDataviewJs, enableInlineDataviewJs,
+    refreshInterval, taskCompletionTracking. Research doc_id 1030
+    (KB) is the source of truth for the v0.5.0 architecture; raw
+    research at raw/Obsidian_Template_Research_for_Paperwik.md.
+
     v0.4.3 -- author attribution. Claude Desktop's plugin detail page
     previously showed "Paperwik Maintainer" as the author, which is
     generic and doesn't link anywhere. Changed to "s0phak1ng" with a
@@ -1592,6 +1655,178 @@ if (Test-Path $vaultRoot) {
     }
 }
 
+# --- (c5) Download Obsidian community plugin binaries from GitHub Releases ---
+# v0.5.0 ships a 6-plugin roster (Dataview, Marp, Hover Editor, Recent Files,
+# Better Search Views, Image Toolkit). The old pattern just listed them in
+# community-plugins.json without installing the binaries — Obsidian then showed
+# a "plugin not installed" dialog on first open, which shattered user trust.
+# This step reads the paperwik-specific manifest and fetches each plugin's
+# main.js + manifest.json + styles.css from the latest GitHub release.
+# Idempotent: skips download if target manifest.json already present with a
+# matching version.
+$obsidianPluginsDir = Join-Path $vaultRoot "Vault\.obsidian\plugins"
+$pluginManifestFile = Join-Path $paperwikDir "scripts\obsidian-plugins-manifest.json"
+if ((Test-Path $vaultRoot) -and (Test-Path $pluginManifestFile)) {
+    try {
+        if (-not (Test-Path $obsidianPluginsDir)) {
+            New-Item -ItemType Directory -Path $obsidianPluginsDir -Force | Out-Null
+        }
+
+        $manifestRaw = Get-Content $pluginManifestFile -Raw -ErrorAction Stop
+        $manifest = $manifestRaw | ConvertFrom-Json -ErrorAction Stop
+
+        foreach ($plugin in $manifest.plugins) {
+            $pluginId = $plugin.id
+            $repo = $plugin.repo
+            $targetDir = Join-Path $obsidianPluginsDir $pluginId
+            $targetManifest = Join-Path $targetDir "manifest.json"
+
+            # Idempotent skip: if manifest.json already present, assume installed
+            if (Test-Path $targetManifest) {
+                Write-Host "      Plugin '$pluginId' already installed; skipping." -ForegroundColor DarkGray
+                continue
+            }
+
+            if (-not (Test-Path $targetDir)) {
+                New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+
+            try {
+                # Fetch latest release metadata to get the tag and asset download URLs
+                $releaseApi = "https://api.github.com/repos/$repo/releases/latest"
+                $headers = @{ "User-Agent" = "paperwik-installer" }
+                $release = Invoke-RestMethod -Uri $releaseApi -Headers $headers -ErrorAction Stop
+                $tag = $release.tag_name
+
+                # Each release provides main.js, manifest.json, styles.css at
+                # https://github.com/<repo>/releases/download/<tag>/<asset>
+                $baseUrl = "https://github.com/$repo/releases/download/$tag"
+                foreach ($asset in $plugin.assets) {
+                    $assetUrl = "$baseUrl/$asset"
+                    $assetPath = Join-Path $targetDir $asset
+                    try {
+                        Invoke-WebRequest -Uri $assetUrl -OutFile $assetPath -Headers $headers -ErrorAction Stop
+                    } catch {
+                        # Some plugins omit optional assets (e.g., no styles.css).
+                        # Only flag the required ones as failures.
+                        if ($asset -eq "main.js" -or $asset -eq "manifest.json") {
+                            throw "Required asset '$asset' missing from $tag release: $($_.Exception.Message)"
+                        } else {
+                            Write-Host "      Optional asset '$asset' not in $pluginId $tag; skipping." -ForegroundColor DarkGray
+                        }
+                    }
+                }
+                Write-Host "      Installed Obsidian plugin '$pluginId' ($tag)." -ForegroundColor Green
+            } catch {
+                Write-Host "      Could not install plugin '$pluginId' from $repo: $($_.Exception.Message)" -ForegroundColor Yellow
+                # Leave empty plugin dir behind; user can retry by re-running installer.
+            }
+        }
+    } catch {
+        Write-Host "      Plugin installer step couldn't start: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+# --- (c6) Workspace layout injection (one-time, bypass OneDrive conflict) ----
+# Obsidian writes workspace.json multiple times per minute (pane resize, tab
+# open, cursor move). OneDrive / Dropbox / GDrive lock files during upload;
+# simultaneous writes generate "conflict copy" files that multiply into
+# hundreds over time. We solve this by NOT shipping workspace.json in the
+# template repo. Instead we ship workspace-default.json and copy it ONCE on
+# first install, never overwriting if the user already has a customized
+# workspace.json. After the copy, Obsidian owns workspace.json locally —
+# never git-tracked, never re-copied, no sync conflicts against paperwik.
+$vaultObsidianDir = Join-Path $vaultRoot "Vault\.obsidian"
+$workspaceDefault = Join-Path $paperwikDir "templates\paperwik\Vault\.obsidian\workspace-default.json"
+$workspaceTarget = Join-Path $vaultObsidianDir "workspace.json"
+if ((Test-Path $workspaceDefault) -and (Test-Path $vaultObsidianDir)) {
+    if (-not (Test-Path $workspaceTarget)) {
+        try {
+            Copy-Item $workspaceDefault $workspaceTarget -Force
+            Write-Host "      Seeded Obsidian workspace layout (File Explorer left, Welcome center, Local Graph + Recent Files right)." -ForegroundColor Green
+        } catch {
+            Write-Host "      Couldn't seed workspace.json: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "      Obsidian workspace.json already exists; preserving user layout." -ForegroundColor DarkGray
+    }
+}
+
+# --- (c7) Generate Obsidian Web Clipper import file --------------------------
+# The Obsidian Web Clipper browser extension is the one-click route from
+# Chrome/Edge to Vault/Inbox/. Its settings can't be pushed remotely, but
+# it accepts a JSON import via Settings -> Import. We generate that import
+# file once at ~/Paperwik/web-clipper-import.json so the user imports it
+# via the extension UI and captured articles route straight to Inbox with
+# paperwik-recognized YAML frontmatter.
+$webClipperPath = Join-Path $paperwikRoot "web-clipper-import.json"
+try {
+    $webClipperConfig = [PSCustomObject]@{
+        schemaVersion = "0.1.0"
+        templates = @(
+            [PSCustomObject]@{
+                name = "Paperwik Inbox"
+                behavior = "create"
+                noteContentFormat = "---`n" +
+                    "status: uningested`n" +
+                    "source_type: web_article`n" +
+                    "captured_at: {{date}}`n" +
+                    "source_url: {{url}}`n" +
+                    "title: `"{{title}}`"`n" +
+                    "---`n`n" +
+                    "# {{title}}`n`n{{content}}"
+                noteNameFormat = "{{title|safe_name}}"
+                path = "Vault/Inbox/"
+                vault = "Paperwik"
+                properties = @()
+            }
+        )
+    }
+    $webClipperJson = $webClipperConfig | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($webClipperPath, $webClipperJson, (New-Object System.Text.UTF8Encoding $false))
+    Write-Host "      Generated Web Clipper import at $webClipperPath (import via browser extension Settings > Import)." -ForegroundColor Green
+} catch {
+    Write-Host "      Couldn't generate Web Clipper import file: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+# --- (c8) Enable paperwik.css snippet in appearance.json ---------------------
+# Obsidian only applies CSS snippets listed in appearance.json.enabledCssSnippets.
+# We want paperwik.css on by default so the brand styling renders on first
+# launch. We DON'T enable user-custom.css — user opts in manually if they
+# want to use that safe-tweak surface.
+$appearancePath = Join-Path $vaultObsidianDir "appearance.json"
+try {
+    $appearance = [PSCustomObject]@{}
+    if (Test-Path $appearancePath) {
+        try {
+            $rawAppearance = Get-Content $appearancePath -Raw -ErrorAction SilentlyContinue
+            if ($rawAppearance -and $rawAppearance.Trim()) {
+                $parsed = $rawAppearance | ConvertFrom-Json -ErrorAction Stop
+                if ($parsed -is [PSCustomObject]) { $appearance = $parsed }
+            }
+        } catch {
+            Write-Host "      Existing appearance.json wasn't valid JSON; replacing." -ForegroundColor Yellow
+        }
+        # Back up existing appearance.json before modification
+        $appearanceBak = "$appearancePath.bak-$(Get-Date -Format 'yyyyMMddHHmmss')"
+        Copy-Item $appearancePath $appearanceBak -Force
+    }
+
+    # Ensure enabledCssSnippets array exists; add "paperwik" if absent
+    if (-not $appearance.PSObject.Properties['enabledCssSnippets']) {
+        $appearance | Add-Member -NotePropertyName 'enabledCssSnippets' -NotePropertyValue @('paperwik') -Force
+    } elseif ($appearance.enabledCssSnippets -notcontains 'paperwik') {
+        $updated = @($appearance.enabledCssSnippets) + 'paperwik'
+        $appearance.enabledCssSnippets = $updated
+    }
+
+    $appearanceJson = $appearance | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($appearancePath, $appearanceJson, (New-Object System.Text.UTF8Encoding $false))
+    Write-Host "      Enabled paperwik.css snippet in Obsidian appearance settings." -ForegroundColor Green
+} catch {
+    Write-Host "      Couldn't enable paperwik.css snippet: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
 # --- (d) Register vault in Obsidian's vault list -----------------------------
 # Note: we DROPPED the icon ICO conversion + WT profile + Start menu/Desktop
 # shortcut creation that v0.1.x did. The user opens Claude Desktop's Code tab
@@ -1702,7 +1937,18 @@ Write-Host "        what do I know about <a topic>?" -ForegroundColor Yellow
 Write-Host "        summarize the last few sources I added" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  7. To browse your wiki visually, open Obsidian from your Start" -ForegroundColor White
-Write-Host "     menu. Your vault opens automatically."
+Write-Host "     menu. Your vault opens automatically. You'll see:" -ForegroundColor White
+Write-Host "       - Welcome.md open in reading view (center)" -ForegroundColor DarkGray
+Write-Host "       - File Explorer pinned on the left" -ForegroundColor DarkGray
+Write-Host "       - Local Graph + Recent Files on the right" -ForegroundColor DarkGray
+Write-Host "       - Alt+H to return to Welcome at any time" -ForegroundColor DarkGray
+Write-Host "       - Alt+I to jump to the Inbox folder" -ForegroundColor DarkGray
+Write-Host "       - Ctrl+G to toggle the full graph view" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  8. (Optional) Install the Obsidian Web Clipper browser extension" -ForegroundColor White
+Write-Host "     from https://obsidian.md/clipper. Then in its Settings -> Import," -ForegroundColor White
+Write-Host "     pick this file to route captures straight to Paperwik:" -ForegroundColor White
+Write-Host "        $env:USERPROFILE\Paperwik\web-clipper-import.json" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Green
 Write-Host ""

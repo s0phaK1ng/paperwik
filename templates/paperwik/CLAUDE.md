@@ -167,7 +167,7 @@ If `.claude/tombstones.jsonl` does not exist, proceed normally.
   on this.
 - **Never write into the user's view without intent.** User-facing content
   goes in `Vault/`. System files (logs, DB, state) stay at the system root.
-- **Never modify `Vault/.obsidian/` or `.git/`.** They are out of bounds.
+- **Never modify `Vault/.obsidian/` or `.git/`.** They are out of bounds. Paperwik's shipped `.obsidian/` template (graph, hotkeys, CSS snippet, plugin binaries, Dataview security lockdown) is installed ONCE by the installer + refreshed on upgrade. At runtime the agent never writes there.
 - **Never attempt destructive git operations.** The bundled safety rail
   blocks force-push, hard-reset, and branch deletion regardless of request.
 - **Ask once, cache the answer.** If content ambiguity forces a question,
