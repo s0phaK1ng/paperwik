@@ -18,14 +18,22 @@ the end of the training session.
   error. That's on purpose — it's the safety rail.
 
 ### Read new sources for you
-- Drop a PDF, a markdown export, or a Gemini Deep Research report into
-  `Vault/Inbox/`.
-- Say *"ingest this"* or *"ingest the new source."*
-- Your helper reads it, writes a summary, creates a topical folder (or
-  files it into an existing one), pulls out the people and ideas and
-  papers, and weaves everything into your wiki.
-- Your original source isn't deleted — it just moves from `Vault/Inbox/`
-  into `Vault/Projects/<Project>/_sources/` so your Inbox stays tidy.
+
+Two equivalent paths — pick whichever fits your moment.
+
+**Path 1 (primary, easiest):** drag a PDF, a markdown export, or a
+Gemini Deep Research report from File Explorer directly into Claude
+Desktop's chat bar. Say *"ingest this"* and send.
+
+**Path 2 (good for batches, or if you're already in Obsidian):** drop
+one or more files into `C:\Users\<you>\Paperwik\Vault\Inbox\`. Say
+*"ingest my Inbox"* or *"ingest the new sources."*
+
+Either way, your helper reads each source, writes a summary, creates a
+topical folder (or files it into an existing one), pulls out the people
+and ideas and papers, and weaves everything into your wiki. Your
+original source isn't deleted — it moves into
+`Vault/Projects/<Project>/_sources/` so your Inbox stays tidy.
 
 ### Research a topic for you, end-to-end
 - Say *"research [topic] thoroughly"* — for example,
@@ -151,7 +159,10 @@ the end of the training session.
 ## Things to say, any time
 
 The every-day stuff:
-- **"Ingest this"** — reads and files the newest thing in `Vault/Inbox/`.
+- **"Ingest this"** (after dragging a file into the chat bar) — reads
+  and files the attached source.
+- **"Ingest my Inbox"** — reads and files everything currently in
+  `Vault/Inbox/`. Use this when you've dropped multiple files at once.
 - **"Research [topic] thoroughly"** — ~10-min cited research report
   dropped in `Vault/Inbox/`. Shows a cost/time estimate before it runs.
 - **"What do I know about X?"** — searches and summarizes with sources.

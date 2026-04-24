@@ -1,12 +1,12 @@
 # What is Paperwik?
 
-Paperwik turns your Claude Pro or Claude Max subscription into a personal research wiki. You drop articles, PDFs, Word documents, or text files into a single folder on your PC and tell Claude "ingest this." Claude reads the source, writes a clear summary page, and creates cross-referenced pages for the people, concepts, papers, and organizations it mentions. Over time your vault becomes a searchable second brain where every note links to every related note.
+Paperwik turns your Claude Pro or Claude Max subscription into a personal research wiki. You hand Claude a source — usually by dragging a PDF, article, or Word document straight into Claude Desktop's chat bar, or by dropping it into the `Inbox/` folder of your vault — and say "ingest this." Claude reads the source, writes a clear summary page, and creates cross-referenced pages for the people, concepts, papers, and organizations it mentions. Over time your vault becomes a searchable second brain where every note links to every related note.
 
 You read your wiki in **Obsidian** (a beautiful free note-taking app that the installer set up for you). You talk to Claude in **Claude Desktop** -- specifically the **Code tab**, where Paperwik lives as a plugin.
 
 ## What Paperwik can do (as of v0.4.0)
 
-- **Ingest** -- drop any readable file into `Vault/Inbox/` and say "ingest this." Claude reads it, decides which project folder it belongs in, and writes summary + entity pages inside `Vault/Projects/<Project>/`.
+- **Ingest** -- two equivalent paths. (a) Drag a readable file into Claude Desktop's chat bar and say "ingest this" (easiest, what most users do). (b) Drop one or more files into `Vault/Inbox/` and say "ingest my Inbox" (better for batches or Obsidian-native workflow). Claude reads, decides which project folder it belongs in, and writes summary + entity pages inside `Vault/Projects/<Project>/`.
 - **Search** -- ask a plain-English question. Paperwik runs hybrid retrieval (keyword + semantic + entity graph + cross-encoder reranking) across your entire wiki and answers with citations.
 - **Deep research** -- say "research cognitive health thoroughly" (any topic) and Paperwik runs a 4-phase research pipeline using Claude's built-in web tools. Takes ~10 minutes. Drops a 3,000-8,000 word cited synthesis into `Vault/Inbox/` for the normal ingest flow to absorb. Shows a cost/time estimate up front -- you say "yes" to proceed or "no" to cancel. No external API keys required.
 - **Auto-link** -- every new page automatically cross-references existing entity pages. A second mention of "Andrej Karpathy" updates his existing page instead of creating a duplicate.

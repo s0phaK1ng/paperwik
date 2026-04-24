@@ -28,6 +28,60 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.4.1 -- doc-sweep hotfix. Matt flagged three gaps in v0.4.0:
+    (1) the README hadn't been updated to reflect current behavior
+    (still said "Pre-alpha, v0.1.0 is the first public release" at
+    the Status section and used stale "/plugin marketplace add"
+    language); (2) every user-facing ingest doc described the primary
+    ingest flow as "drop into Vault/Inbox/" when in practice most
+    users will drag files directly into Claude Desktop's chat bar;
+    and (3) the installer's final message and the help/troubleshooting
+    docs all said "look for paperwik under Personal" but recent Claude
+    Desktop builds show paperwik under the Code tab (observed on both
+    Matt's sandbox AND a friend's fresh install -- Personal tab may
+    not even exist anymore on some versions). Fixed all three
+    everywhere, saved memory rules so the issues don't regress.
+
+    Changes from v0.4.0:
+      - README.md: rewritten "What it is" to lead with drag-and-drop
+        into chat; "How it's delivered today" cleaned up (one-liner
+        now auto-registers the plugin, no manual /plugin marketplace
+        add step); Status bumped Pre-alpha/v0.1.0 -> v0.4.0 current;
+        Roadmap version tags realigned; Internal design log adds
+        decisions #317 + #321-326 for v0.3.0/v0.4.0.
+      - GitHub repo description updated via `gh repo edit` to mention
+        research skill; 10 topics added (obsidian, claude-code,
+        claude-plugin, knowledge-management, wiki, pkm, llm-agent,
+        markdown, windows, deep-research).
+      - skills/paperwik-help/references/how-to.md: "Ingest" section
+        rewritten with two paths (chat-bar drag primary, Inbox drop
+        secondary). what-is-paperwik.md same treatment.
+      - docs/OPERATIONAL-ENVELOPE.md: "Read new sources for you"
+        rewritten with two paths. "Things to say" gains "ingest my
+        Inbox" variant.
+      - templates/paperwik/Vault/Welcome.md: first-step walkthrough
+        now shows both paths; "Things you can say" distinguishes
+        "ingest this" (file attached) from "ingest my Inbox".
+      - templates/paperwik/CLAUDE.md: Ingest operation covers both
+        trigger paths so the agent handles attached-file ingests
+        without asking. Compressed Ingest + Research subsections to
+        keep total under Anthropic's 200-line cap (195 lines).
+      - docs/Paperwik-User-Guide.docx regenerated via pandoc pipeline
+        to pick up the how-to / what-is-paperwik / troubleshooting
+        edits.
+      - install.ps1 final-message step 5: "look for Personal section
+        and click paperwik" -> "click Code tab, find and click
+        paperwik". Added a fallback note about older builds showing
+        Personal tab.
+      - skills/paperwik-help/references/how-to.md and
+        troubleshooting.md: "click paperwik under Personal" rewritten
+        to "click paperwik (under Code tab on recent Claude Desktop,
+        or Personal on older builds)".
+      - plugin.json + marketplace.json bumped 0.4.0 -> 0.4.1.
+
+    No code changes to hooks, scripts, or the research skill itself.
+    This is a pure documentation correctness ship.
+
     v0.4.0 -- adds the `research` skill: a Claude-Code-native 4-phase
     deep-research engine (PLANNER -> SEARCHER -> parallel SECTION WRITERS
     -> EDITOR + SANITIZER) that drops synthesis docs into Vault/Inbox/
@@ -1575,13 +1629,17 @@ Write-Host ""
 Write-Host "  5. Turn on Paperwik (one time, takes 5 seconds):" -ForegroundColor White
 Write-Host "       - Click the + button to the left of the chat box" -ForegroundColor White
 Write-Host "       - Click 'Plugins'" -ForegroundColor White
-Write-Host "       - Look for 'Personal' section and click 'paperwik'" -ForegroundColor White
+Write-Host "       - In the Directory dialog that opens, click the 'Code' tab" -ForegroundColor White
+Write-Host "         along the top (it's usually the default)." -ForegroundColor White
+Write-Host "       - Find and click 'paperwik' in the list." -ForegroundColor White
 Write-Host "       - Click the + (or Enable) on the paperwik detail page" -ForegroundColor White
 Write-Host "     After that, Paperwik's skills appear when you type / in the chat." -ForegroundColor DarkGray
 Write-Host ""
-Write-Host "     If you don't see the 'Personal' section at all, Claude hasn't" -ForegroundColor DarkYellow
-Write-Host "     picked up the new plugin yet. Fully quit Claude (tray icon ->" -ForegroundColor DarkYellow
-Write-Host "     Quit) and reopen it, then try again. One restart is enough." -ForegroundColor DarkYellow
+Write-Host "     If you don't see 'paperwik' in the list, Claude hasn't picked up" -ForegroundColor DarkYellow
+Write-Host "     the new plugin yet. Fully quit Claude (tray icon -> Quit) and" -ForegroundColor DarkYellow
+Write-Host "     reopen it, then try again. One restart is enough." -ForegroundColor DarkYellow
+Write-Host "     (Older Claude Desktop builds may show paperwik under a" -ForegroundColor DarkGray
+Write-Host "     'Personal' tab instead of 'Code' -- either location works.)" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  6. Type what you want, like:" -ForegroundColor White
 Write-Host "        ingest https://example.com/an-article-i-want-saved" -ForegroundColor Yellow

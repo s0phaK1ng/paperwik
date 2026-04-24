@@ -69,9 +69,13 @@ first glance; the correct path above is always present on a standard install.
 
 ## The four operations
 
-### Ingest (user drops content into `Vault/Inbox/` and says "ingest this")
+### Ingest
 
-1. Route the source to the right project via the bundled router script. If
+Trigger paths (same flow downstream): **"ingest this"** with a file attached in chat (primary — treat the attachment as source, copy to `Vault/Inbox/` first so `_sources/` has a canonical path), OR **"ingest my Inbox"** / "ingest the new source" (walks `Vault/Inbox/` for pending files).
+
+For each source:
+
+1. Route to the right project via the bundled router script. If
    similarity to all existing projects is below 0.55, propose a new project.
    Otherwise file into the closest match without asking.
 2. Read the source. Extract key points, entities, and claims.
@@ -101,10 +105,7 @@ a page. Report findings; make fixes on request.
 
 ### Research (user says "research X thoroughly")
 
-Invoke the `research` skill. It's a ~10-min 4-phase pipeline that produces
-a cited long-form synthesis dropped into `Vault/Inbox/`. Always show the
-cost/time confirmation before engaging. Do NOT invoke for short factual
-questions -- those are Query, not Research.
+Invoke the `research` skill. ~10-min 4-phase pipeline producing a cited long-form synthesis dropped into `Vault/Inbox/`. Always show the cost/time confirmation before engaging. Do NOT invoke for short factual questions — those are Query, not Research.
 
 ## Memory discipline
 

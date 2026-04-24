@@ -47,7 +47,7 @@ Takes about 10 seconds either way.
 **Fix**:
 1. Right-click the Claude icon in the Windows system tray (bottom-right near the clock), click **Quit**. That's a real shutdown -- closing the window isn't enough.
 2. Reopen Claude Desktop from the Start menu.
-3. Click **+** -> **Plugins**. Paperwik should now appear under **Personal**.
+3. Click **+** -> **Plugins**. Paperwik should now appear in the list (usually under the **Code** tab, or **Personal** on older Claude Desktop builds — either one works).
 
 One restart is almost always enough.
 
@@ -58,7 +58,7 @@ One restart is almost always enough.
 **Why**: Claude Desktop reads plugin files at startup and does not auto-reload when the files on disk change. After an update, Desktop keeps running the old version in memory until you explicitly tell it to reload.
 
 **Fix**:
-1. **+** button -> **Plugins** -> click **paperwik** under Personal.
+1. **+** button -> **Plugins** -> click **paperwik** (under the **Code** tab on recent Claude Desktop, or **Personal** on older builds).
 2. Click **Update** on the plugin detail page. Desktop reloads from disk.
 3. Click **Enable** on the same page even if it already shows enabled -- the version bump resets the enable state.
 

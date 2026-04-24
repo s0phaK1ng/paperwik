@@ -2,11 +2,23 @@
 
 ## Ingest an article, PDF, or Word doc
 
-1. Save the file into `C:\Users\<you>\Paperwik\Vault\Inbox\`. File Explorer drag-and-drop is fine. Any filename works.
-2. In Claude Desktop's Code tab, type: **ingest this** (or "ingest the new source", or "read my Inbox").
-3. Wait 10-60 seconds per document. On a first-ever ingest expect 3-5 minutes extra while Paperwik downloads its embedding and reranking models (about 600 MB, one-time).
-4. Paperwik reports what it did: which project folder it filed under (creating one if needed), how many entity pages it created or updated, and how many chunks went into the search index.
-5. When it's done, the source file moves from `Vault/Inbox/` into `Vault/Projects/<Project>/_sources/`. Summary pages live in `Vault/Projects/<Project>/<Page>.md`. Entity pages live in `Vault/Projects/<Project>/Entities/<Entity>.md`.
+Two equivalent ways — pick whichever feels easier. Result is the same.
+
+**Way 1 (easiest, what most people do): drag-and-drop into Claude Desktop's chat bar.**
+
+1. In Claude Desktop, open the Code tab.
+2. Drag the file from File Explorer straight into the chat box. You'll see it attached as a chip (with the filename visible).
+3. Type **ingest this** and send.
+4. Wait 10-60 seconds per document. On a first-ever ingest expect 3-5 minutes extra while Paperwik downloads its embedding and reranking models (about 600 MB, one-time).
+5. Paperwik reports what it did: which project folder it filed under (creating one if needed), how many entity pages it created or updated, and how many chunks went into the search index.
+
+**Way 2 (better for batches, or if you live in Obsidian): drop into the vault's Inbox folder.**
+
+1. Save the file into `C:\Users\<you>\Paperwik\Vault\Inbox\`. File Explorer drag-and-drop is fine. Any filename works. You can drop multiple files at once.
+2. In Claude Desktop's Code tab, type **ingest my Inbox** (or "ingest the new sources", or "read everything in Inbox").
+3. Paperwik walks the Inbox and ingests each file in turn. Same reporting as Way 1.
+
+**Either way, when ingest finishes:** the source file lives at `Vault/Projects/<Project>/_sources/<filename>`. Summary pages live in `Vault/Projects/<Project>/<Page>.md`. Entity pages live in `Vault/Projects/<Project>/Entities/<Entity>.md`.
 
 ## Ingest something from a web page
 
@@ -67,7 +79,7 @@ When the maintainer publishes a new version:
 
 1. In Claude Desktop's Code tab, click the **+** button next to the chat box.
 2. Click **Plugins**.
-3. Click **paperwik** under Personal.
+3. In the Directory dialog that opens, make sure the **Code** tab is selected (usually is by default), then click **paperwik** in the list. (On older Claude Desktop builds, paperwik may appear under a **Personal** tab instead — either location works.)
 4. Click **Update** on the plugin detail page. Desktop reloads the new version.
 5. Click **Enable** on the same page even if it already shows as enabled -- Claude Desktop resets the enable state on every version bump (this is a Desktop UX quirk, not a Paperwik bug).
 6. Fully quit and reopen Claude Desktop if skills don't immediately appear.

@@ -28,9 +28,12 @@ Just three folders. That's the whole setup.
 
 1. Find a document you care about — an article you bookmarked, a report
    you've been meaning to read, a Deep Research export from Gemini.
-2. Drop it into `Inbox/`.
-3. Tell your helper: *"ingest the new source."*
-4. Watch `Projects/` fill in as your helper creates pages, connects them,
+2. **Hand it to your helper.** Two equivalent ways:
+   - **Easiest:** in Claude Desktop's Code tab, drag the file straight
+     into the chat box. You'll see it attached. Type *"ingest this"* and send.
+   - **Or:** drop it into the `Inbox/` folder (visible right here in
+     Obsidian) and say *"ingest my Inbox."*
+3. Watch `Projects/` fill in as your helper creates pages, connects them,
    and pulls out the people and ideas worth remembering.
 
 The first time you do this, there's a one-time setup that downloads the
@@ -39,7 +42,10 @@ on a normal internet connection — after that, ingests are fast.
 
 ## Things you can say, any time
 
-- *"Ingest this."* — Reads the newest file in `Inbox/` and files it.
+- *"Ingest this."* — With a file attached to the chat (drag into chat
+  bar), reads that file and files it. With nothing attached, reads the
+  newest file in `Inbox/`.
+- *"Ingest my Inbox."* — Walks `Inbox/` and files everything at once.
 - *"Ingest [URL]."* — Fetches the URL, saves it, and files it.
 - *"Research [topic] thoroughly."* — Your helper spends ~10 minutes
   reading the web and writes a cited long-form report, then drops it

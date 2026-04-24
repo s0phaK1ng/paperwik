@@ -8,12 +8,17 @@ An AI helper that quietly keeps your notes organized for you.
 
 ## What it is
 
-Paperwik turns a capable AI agent into a personal research and journaling archivist. You drop sources in; it reads, summarizes, cross-links, and keeps a growing markdown wiki in your Obsidian vault.
+Paperwik turns a capable AI agent into a personal research and journaling archivist. You hand it sources; it reads, summarizes, cross-links, and keeps a growing markdown wiki in your Obsidian vault.
 
-- Drop PDFs, articles, or Gemini Deep Research exports into an `Inbox/` folder (under the vault).
-- Say "ingest this."
-- The agent reads, summarizes, routes to a topical folder (auto-created if needed), pulls out the people and ideas worth tracking, and weaves everything into your wiki.
-- You read and browse in Obsidian — graph view, backlinks, Dataview queries.
+**Two ways to ingest:**
+
+- **Primary (what most users do):** drag a PDF, article, or markdown export from File Explorer directly into **Claude Desktop's chat bar** and say *"ingest this."*
+- **Secondary (good for batching or Obsidian-native workflow):** drop files into the vault's `Inbox/` folder — visible in Obsidian's file tree — and say *"ingest my Inbox."*
+
+Either way, the agent reads, summarizes, routes to a topical folder (auto-created if needed), pulls out the people and ideas worth tracking, and weaves everything into your wiki.
+
+- You read and browse in **Obsidian** — graph view, backlinks, Dataview queries.
+- Need a deeper dive? Say *"research X thoroughly"* and paperwik runs a ~10-minute 4-phase research pipeline using Claude's built-in web tools, dropping the cited writeup into your vault's `Inbox/` for the normal ingest flow to absorb.
 - Everything is plain markdown on your disk. No cloud, no database, no vendor lock-in.
 
 ## The bet (Karpathy's framing)
@@ -38,9 +43,9 @@ Read [the original gist](https://gist.github.com/karpathy/442a6bf555914893e9891c
 
 ## How it's delivered today
 
-1. Run the one-line bootstrap: `irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex` — installs Claude Desktop (with Claude Code), Obsidian, and `uv`.
-2. Open Claude Code (inside Claude Desktop), run `/plugin marketplace add s0phak1ng/paperwik` + `/plugin install paperwik`.
-3. On first session, the scaffolding hook creates the vault at `%USERPROFILE%\Paperwik\` and downloads the retrieval models once (~3–5 min). After that, it's instant.
+1. Run the one-line bootstrap from PowerShell: `irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex` — installs Git, Claude Desktop (which includes the Claude Code CLI), Obsidian, VC++ redist, and `uv`, then pre-clones the paperwik plugin and registers it with Claude Code so no manual `/plugin marketplace add` is required.
+2. Open Claude Desktop. In the **Code tab**, click **+** → Plugins → paperwik → **Update** → **Enable**. Claude Desktop resets the enable state on version bumps, so re-click Enable even if it already looks enabled.
+3. On first session in the scaffolded `%USERPROFILE%\Paperwik\` vault, the SessionStart hook finalizes the layout and downloads the retrieval models once (~3–5 min, ~600 MB). After that, it's instant.
 
 No custom installer to build. No Python environment management for the end user. One bundled binary (`git-filter-repo.exe`) for the redaction feature.
 
@@ -50,10 +55,10 @@ Paperwik's valuable piece is the **methodology** — how an AI agent maintains a
 
 Adapters planned:
 
-- **v1 (today):** Claude Code, running inside Claude Desktop on Windows.
-- **v1.1+:** Gemini CLI adapter.
-- **v1.2+:** OpenAI Codex adapter (AGENTS.md-based).
-- **v2:** Local-LLM adapter (Ollama or similar), for people who want the pattern fully offline.
+- **Today (v0.4.0):** Claude Code, running inside Claude Desktop on Windows.
+- **Next:** Gemini CLI adapter.
+- **Then:** OpenAI Codex adapter (AGENTS.md-based).
+- **Long term:** Local-LLM adapter (Ollama or similar), for people who want the pattern fully offline.
 
 The core retrieval + memory + graph code in `scripts/` is already agent-agnostic and will port directly. The adapter layer for each agent is the new work.
 
@@ -78,7 +83,7 @@ Karpathy's gist describes the **pattern** at an idea level. It explicitly invite
 ### What we kept from the original
 
 - **The three layers:** immutable raw sources, an agent-owned wiki, a schema file teaching the agent how to behave.
-- **The three operations:** ingest, query, lint.
+- **The three operations, now four:** ingest, query, lint — and in paperwik v0.4.0, deep research.
 - **The `index.md` + `log.md` convention** for navigation and history.
 - **Obsidian as the reading surface.** Graph view, backlinks, Dataview — all preserved.
 - **Standard markdown, no proprietary formats.** Your notes survive the tool.
@@ -118,10 +123,12 @@ Major architectural decisions are tracked in the parent project's knowledge base
 - `#300` Entity graph at ingest, not as future work
 - `#301` 20-question eval harness from day one
 - `#302` Two-band project routing with override learning
+- `#317` Embedded help via `paperwik-help` skill + 3 Diataxis references + single-source pandoc pipeline (v0.3.0)
+- `#321–326` Deep-research skill as a 4-phase Claude-Code-native pipeline: hybrid model routing (Sonnet synthesis / Haiku retrieval), explicit `model:` pin in every Task call, default 3 section writers, up-front cost/time gate, bundled open-Q resolutions (v0.4.0)
 
 ## Status
 
-Pre-alpha. v0.1.0 is the first public release. First target user is a non-technical Windows user doing heavy Gemini Deep Research. Free and open source; no ads, no subscriptions beyond your own Claude Pro/Max plan.
+**v0.4.0 (April 2026).** Current release. First target user is a non-technical Windows user doing heavy Gemini Deep Research. Free and open source; no ads, no subscriptions beyond your own Claude Pro/Max plan. The v0.4.0 ship adds an in-session `research` skill so users don't need to bounce out to Gemini Deep Research and back; see the `.NOTES` block in `install.ps1` for the full changelog.
 
 ## License
 
