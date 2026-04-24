@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "paperwik",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Paperwik marketplace - a single-plugin marketplace that publishes the Paperwik agent-maintained Obsidian knowledge base plugin.",
   "owner": {
     "name": "s0phak1ng",
@@ -11,7 +11,7 @@
     {
       "name": "pw",
       "description": "Agent-maintained Obsidian knowledge base. The LLM reads your sources, writes summary pages, maintains cross-references, and builds a persistent wiki that compounds over time. Non-technical Windows users never touch a terminal command beyond 'ingest this' or 'what do I know about X'.",
-      "version": "0.5.2",
+      "version": "0.5.3",
       "source": {
         "source": "url",
         "url": "https://github.com/s0phak1ng/paperwik.git"

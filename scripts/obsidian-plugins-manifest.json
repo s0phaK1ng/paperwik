@@ -9,9 +9,9 @@
     },
     {
       "id": "marp-slides",
-      "repo": "MSzturc/marp-slides",
+      "repo": "samuele-cozzi/obsidian-marp-slides",
       "assets": ["main.js", "manifest.json", "styles.css"],
-      "note": "Slide deck rendering from markdown. Passive render layer — no auto-write risk."
+      "note": "Slide deck rendering from markdown. Passive render layer — no auto-write risk. v0.5.2 pointed at wrong repo MSzturc/marp-slides (404); v0.5.3 corrected to Obsidian community-plugins.json's actual marp-slides registry entry."
     },
     {
       "id": "obsidian-hover-editor",

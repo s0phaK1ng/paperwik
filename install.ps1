@@ -28,6 +28,26 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.5.3 -- two live-install bugs Matt hit in the sandbox.
+
+    Bug 1: Obsidian plugin 'marp-slides' at MSzturc/marp-slides was
+    404. MSzturc ships a different plugin (Advanced Slides / slides-
+    extended). The actual Obsidian community-plugins registry maps
+    id 'marp-slides' to samuele-cozzi/obsidian-marp-slides
+    (actively maintained, v0.46.1 as of 2026-04). Corrected the
+    manifest.
+
+    Bug 2: step (c7) Web Clipper import file generator referenced
+    $paperwikRoot which was never defined. The Join-Path call got
+    $null as its base path -> "Cannot bind argument to parameter
+    'Path' because it is null" bubbled out through iex to the user.
+    Everything after c6 silently stopped executing.
+    Fix: $paperwikRoot -> $vaultRoot (the actual ~/Paperwik path
+    variable defined at step 1 of the paperwik section).
+
+    Pre-commit parse-tested per memory rule (Get-Content -Raw
+    -Encoding UTF8). PARSE OK.
+
     v0.5.2 -- network resilience. Matt reported that Obsidian download
     failures on flaky networks dropped the installer into a "open
     browser to obsidian.md/download + MessageBox saying install
@@ -1872,7 +1892,7 @@ if ((Test-Path $workspaceDefault) -and (Test-Path $vaultObsidianDir)) {
 # file once at ~/Paperwik/web-clipper-import.json so the user imports it
 # via the extension UI and captured articles route straight to Inbox with
 # paperwik-recognized YAML frontmatter.
-$webClipperPath = Join-Path $paperwikRoot "web-clipper-import.json"
+$webClipperPath = Join-Path $vaultRoot "web-clipper-import.json"
 try {
     $webClipperConfig = [PSCustomObject]@{
         schemaVersion = "0.1.0"
