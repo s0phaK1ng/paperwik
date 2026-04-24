@@ -28,18 +28,36 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.2.5 — friends-and-family bootstrap. Fixes a plugin-root path
-    resolution gap discovered during v0.2.4 end-to-end test. Every
-    user-facing SKILL.md referenced `${CLAUDE_PLUGIN_ROOT}/scripts/X.py`
-    on the assumption that Claude Code exports CLAUDE_PLUGIN_ROOT to
-    the skill's bash shell. It does not — the substitution only
-    applies to hook command strings, not to subprocesses spawned by
-    the agent's Bash tool. When the agent ran a skill, the literal
-    string `${CLAUDE_PLUGIN_ROOT}` resolved to empty, the script path
-    became `/scripts/X.py`, `uv run` failed, and the agent fell back
-    to manual curation (no DB indexing). Verified in the ingest of a
-    .docx source: the agent wrote summary + entity pages correctly
-    but skipped knowledge.db entirely.
+    v0.2.6 — friends-and-family bootstrap. Fixes the permission-prompt
+    storm during normal agent operation. Users on v0.2.5 and earlier
+    got "Allow once / Allow always" dialogs constantly during ingest
+    because the vault's .claude/settings.json had defaultMode="dontAsk"
+    with a narrow Bash allow list covering only `uv run *`, `git *`,
+    `python -m spacy download *`. Everything else the agent routinely
+    runs (`ls`, `cat`, `echo`, `mkdir`, `find`, `mv`, pandoc, jq, etc.)
+    fell through to the prompt. Yolo mode was effectively off.
+
+    Changes from v0.2.5:
+      - templates/paperwik/.claude/settings.json:
+          defaultMode: "dontAsk" -> "bypassPermissions" (Anthropic's
+              documented strict-yolo mode; stronger than dontAsk)
+          allow: added Bash(*) so ordinary shell commands auto-approve
+          deny: expanded with format, diskpart, shutdown, taskkill /F,
+              del /f /s /q, rmdir /S /Q, rm -fr, Remove-Item * -Recurse
+      - install.ps1 step 7(c2): NEW migration step that unconditionally
+        refreshes the vault's .claude/settings.json from the template
+        on every install run. The scaffolder is sentinel-gated so it
+        only writes settings.json once; without this explicit refresh,
+        existing installs would keep their old narrow permissions
+        after a plugin update. The user's previous settings.json is
+        backed up to settings.json.bak-<timestamp> before overwrite.
+      - plugin.json + marketplace.json bumped to 0.2.6.
+
+    Deny list still blocks destructive ops: C:/** writes, .obsidian/,
+    .git/, CLAUDE.md, knowledge.db, git push --force, git reset --hard,
+    git branch -D, git filter-branch/repo, rm -rf, Remove-Item -Recurse,
+    format, diskpart, shutdown, taskkill /F, del /f /s /q, rmdir /S /Q.
+    The PreToolUse-Governor.ps1 hook remains a second safety gate.
 
     Changes from v0.2.4:
       - All user-facing SKILL.md files (ingest, lint, redact,
@@ -1130,6 +1148,33 @@ if (Test-Path $scaffolder) {
     }
 } else {
     Write-Host "      Scaffolder script not found (plugin clone may have failed). Launching Claude Code will try again." -ForegroundColor Yellow
+}
+
+# --- (c2) Migrate vault .claude/settings.json from template on every run ----
+# The scaffolder is sentinel-gated; it only writes the vault's settings.json
+# once (first run). When we ship a new permissions/allow/deny scheme in a
+# plugin update, the template improves but existing vaults keep their old
+# settings.json. Overwrite unconditionally so v0.2.6+ users get the broader
+# Bash(*) allow + bypassPermissions mode without manual intervention.
+#
+# Back up first so a user with hand-edited settings can recover.
+$templateSettings = Join-Path $paperwikDir "templates\paperwik\.claude\settings.json"
+$vaultSettings    = Join-Path $vaultRoot   ".claude\settings.json"
+if ((Test-Path $templateSettings) -and (Test-Path $vaultRoot)) {
+    try {
+        $vaultClaudeDir = Split-Path -Parent $vaultSettings
+        if (-not (Test-Path $vaultClaudeDir)) {
+            New-Item -ItemType Directory -Path $vaultClaudeDir -Force | Out-Null
+        }
+        if (Test-Path $vaultSettings) {
+            $backup = "$vaultSettings.bak-$(Get-Date -Format 'yyyyMMddHHmmss')"
+            Copy-Item $vaultSettings $backup -Force
+        }
+        Copy-Item $templateSettings $vaultSettings -Force
+        Write-Host "      Refreshed vault permissions from template (bypassPermissions + broad Bash allow + destructive-op deny)." -ForegroundColor Green
+    } catch {
+        Write-Host "      Couldn't refresh vault settings.json: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 }
 
 # --- (d) Register vault in Obsidian's vault list -----------------------------

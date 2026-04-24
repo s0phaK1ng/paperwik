@@ -8,7 +8,7 @@
     "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1"
   },
   "permissions": {
-    "defaultMode": "dontAsk",
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Read(**)",
       "Glob",
@@ -18,9 +18,7 @@
       "Agent(*)",
       "WebFetch",
       "WebSearch",
-      "Bash(uv run *)",
-      "Bash(git *)",
-      "Bash(python -m spacy download *)"
+      "Bash(*)"
     ],
     "deny": [
       "Write(C:/**)",
@@ -43,7 +41,15 @@
       "Bash(git filter-branch*)",
       "Bash(git filter-repo*)",
       "Bash(rm -rf*)",
-      "Bash(Remove-Item -Recurse*)"
+      "Bash(rm -fr*)",
+      "Bash(Remove-Item -Recurse*)",
+      "Bash(Remove-Item * -Recurse*)",
+      "Bash(format *)",
+      "Bash(diskpart *)",
+      "Bash(shutdown*)",
+      "Bash(taskkill /F*)",
+      "Bash(del /f /s /q*)",
+      "Bash(rmdir /S /Q*)"
     ]
   }
 }
