@@ -28,6 +28,39 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.5.2 -- network resilience. Matt reported that Obsidian download
+    failures on flaky networks dropped the installer into a "open
+    browser to obsidian.md/download + MessageBox saying install
+    manually" fallback that's confusing for a non-technical user. Also
+    several other download points (GitHub Releases API, Claude Code
+    install, Claude Desktop manifest, community plugin binaries) had
+    no retry logic — a transient network hiccup could fail the whole
+    installer run.
+
+    New Invoke-WithRetry helper: generic scriptblock wrapper that
+    retries up to 3 times with 2s/4s/8s exponential backoff on any
+    exception. Logs each failed attempt with the reason. Used for:
+      * Get-LatestGithubAsset (Releases API lookup)
+      * Download-File (Invoke-WebRequest wrapper)
+      * Claude Desktop version list + yaml manifest fetches
+      * Claude Code installer fetch (https://claude.ai/install.ps1)
+      * Obsidian plugin binary downloads in step c5 (6 plugins x 3
+        assets each = 18 retry-enabled calls)
+
+    Obsidian download failure UX rewritten. Instead of "opening the
+    download page in your browser and exiting with code 1", the new
+    failure message tells the user (both in console + MessageBox):
+      1. Check your internet connection.
+      2. Wait 5 minutes.
+      3. Re-run the Paperwik installer one-liner.
+    Only after repeated failure should the user escalate to their
+    installer.
+
+    Claude Code installer failure message likewise rewritten.
+
+    No other code or template changes. install.ps1 internal structure
+    is the same as v0.5.1.
+
     v0.5.1 -- hotfix. v0.5.0's step (c5) programmatic plugin installer
     had a PowerShell parser bug in its error-handling path: the string
     "Could not install plugin '$pluginId' from $repo: ..." had $repo:
@@ -794,14 +827,48 @@ function Test-CommandExists {
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+function Invoke-WithRetry {
+    # Generic retry wrapper. Tries the scriptblock up to $MaxAttempts times
+    # with exponential backoff (2s, 4s, 8s). Use this for any transient-
+    # network-error-prone operation: GitHub Releases API calls, file
+    # downloads, winget-pkgs manifest fetches. Network flakes are the
+    # #1 install.ps1 failure mode on consumer Windows (flaky Wi-Fi,
+    # captive portals, firewalls, temporary DNS issues) and the target
+    # user is non-technical — they can't distinguish "the internet
+    # hiccuped" from "the installer is broken."
+    param(
+        [scriptblock]$ScriptBlock,
+        [string]$Label = "network operation",
+        [int]$MaxAttempts = 3
+    )
+    $attempt = 0
+    $lastError = $null
+    while ($attempt -lt $MaxAttempts) {
+        $attempt++
+        try {
+            return & $ScriptBlock
+        } catch {
+            $lastError = $_.Exception.Message
+            if ($attempt -lt $MaxAttempts) {
+                $backoff = [int][math]::Pow(2, $attempt)  # 2s, 4s, 8s
+                Write-Host "      Attempt $attempt of $MaxAttempts for $Label failed ($lastError); retrying in ${backoff}s..." -ForegroundColor Yellow
+                Start-Sleep -Seconds $backoff
+            }
+        }
+    }
+    throw "Failed $Label after $MaxAttempts attempts. Last error: $lastError"
+}
+
 function Get-LatestGithubAsset {
     param(
         [string]$Repo,        # "owner/repo"
         [string]$NamePattern  # regex to match the asset filename
     )
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-    $headers = @{ 'User-Agent' = 'Paperwik-Installer/0.1.1'; 'Accept' = 'application/vnd.github+json' }
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers -UseBasicParsing -TimeoutSec 30
+    $headers = @{ 'User-Agent' = 'Paperwik-Installer/0.5.2'; 'Accept' = 'application/vnd.github+json' }
+    $release = Invoke-WithRetry -Label "GitHub Releases API lookup for $Repo" -ScriptBlock {
+        Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers -UseBasicParsing -TimeoutSec 30
+    }
     $asset = $release.assets | Where-Object { $_.name -match $NamePattern } | Select-Object -First 1
     if (-not $asset) { throw "No release asset in $Repo/latest matching /$NamePattern/" }
     return @{
@@ -812,9 +879,15 @@ function Get-LatestGithubAsset {
 }
 
 function Download-File {
-    param([string]$Url, [string]$Destination)
+    param(
+        [string]$Url,
+        [string]$Destination,
+        [string]$Label = "file"
+    )
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing -UserAgent 'Paperwik-Installer/0.1.8' -TimeoutSec 1200
+    Invoke-WithRetry -Label "download of $Label" -ScriptBlock {
+        Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing -UserAgent 'Paperwik-Installer/0.5.2' -TimeoutSec 1200
+    } | Out-Null
 }
 
 function Get-LatestClaudeDesktopUrl {
@@ -837,7 +910,9 @@ function Get-LatestClaudeDesktopUrl {
     $headers = @{ 'User-Agent' = 'Paperwik-Installer/0.1.7'; 'Accept' = 'application/vnd.github+json' }
 
     $apiUrl = 'https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/a/Anthropic/Claude'
-    $dirs = Invoke-RestMethod -Uri $apiUrl -Headers $headers -UseBasicParsing -TimeoutSec 30
+    $dirs = Invoke-WithRetry -Label "Claude Desktop version-list fetch" -ScriptBlock {
+        Invoke-RestMethod -Uri $apiUrl -Headers $headers -UseBasicParsing -TimeoutSec 30
+    }
     $versionNames = @($dirs | Where-Object { $_.type -eq 'dir' } | ForEach-Object { $_.name })
     if (-not $versionNames) { throw "No Anthropic.Claude version folders in winget-pkgs" }
     $parsed = @($versionNames | ForEach-Object {
@@ -847,7 +922,9 @@ function Get-LatestClaudeDesktopUrl {
     $latest = ($parsed | Sort-Object -Property Version -Descending | Select-Object -First 1).Name
 
     $yamlUrl = "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/a/Anthropic/Claude/$latest/Anthropic.Claude.installer.yaml"
-    $yaml = Invoke-RestMethod -Uri $yamlUrl -Headers $headers -UseBasicParsing -TimeoutSec 30
+    $yaml = Invoke-WithRetry -Label "Claude Desktop manifest fetch" -ScriptBlock {
+        Invoke-RestMethod -Uri $yamlUrl -Headers $headers -UseBasicParsing -TimeoutSec 30
+    }
 
     # Target the single line that declares the x64 .exe installer. The
     # manifest has 4 installer entries (x64 msix, arm64 msix, x64 exe,
@@ -952,11 +1029,19 @@ if (Test-CommandExists "claude") {
     Write-Host "      Already set up, moving on." -ForegroundColor Green
 } else {
     try {
-        Invoke-Expression (Invoke-RestMethod -Uri "https://claude.ai/install.ps1" -UseBasicParsing)
+        $claudeInstallScript = Invoke-WithRetry -Label "Claude Code installer fetch" -ScriptBlock {
+            Invoke-RestMethod -Uri "https://claude.ai/install.ps1" -UseBasicParsing
+        }
+        Invoke-Expression $claudeInstallScript
         Write-Host "      Claude Code ready." -ForegroundColor Green
     } catch {
-        Write-Host "      Hmm, that didn't work: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "      You can try running it directly: irm https://claude.ai/install.ps1 | iex" -ForegroundColor Red
+        $errMsg = $_.Exception.Message
+        Write-Host "      Claude Code installer didn't work: $errMsg" -ForegroundColor Red
+        Write-Host "      This is usually a network issue. Try this:" -ForegroundColor Yellow
+        Write-Host "        1. Check your internet connection." -ForegroundColor White
+        Write-Host "        2. Wait 5 minutes." -ForegroundColor White
+        Write-Host "        3. Re-run the Paperwik installer one-liner:" -ForegroundColor White
+        Write-Host "           irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex" -ForegroundColor Yellow
         exit 1
     }
 }
@@ -1176,15 +1261,28 @@ if ($obsidianInstalled) {
                 throw "Installer ran (exit $exitCode) but no Obsidian.exe or Start-menu shortcut materialized within 45s"
             }
         } catch {
-            Write-Host "      Direct install didn't work: $($_.Exception.Message)" -ForegroundColor Red
-            Write-Host "      Opening Obsidian's download page so you can grab it by hand..." -ForegroundColor Yellow
-            Start-Process "https://obsidian.md/download"
+            $errMsg = $_.Exception.Message
+            Write-Host "      Obsidian download failed after 3 attempts: $errMsg" -ForegroundColor Red
+            Write-Host "" -ForegroundColor White
+            Write-Host "      This is almost always a network issue (weak Wi-Fi, firewall," -ForegroundColor Yellow
+            Write-Host "      captive portal, or a temporary Obsidian/GitHub outage)." -ForegroundColor Yellow
+            Write-Host "" -ForegroundColor White
+            Write-Host "      Try again in a few minutes:" -ForegroundColor White
+            Write-Host "        1. Check your internet connection." -ForegroundColor White
+            Write-Host "        2. Wait 5 minutes." -ForegroundColor White
+            Write-Host "        3. Re-run the installer one-liner. It picks up where it left off." -ForegroundColor White
+            Write-Host "           irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex" -ForegroundColor Yellow
+            Write-Host "" -ForegroundColor White
+            Write-Host "      If that still doesn't work after a couple of tries," -ForegroundColor White
+            Write-Host "      send this error to whoever set Paperwik up for you:" -ForegroundColor White
+            Write-Host "        $errMsg" -ForegroundColor DarkGray
+            Write-Host "" -ForegroundColor White
             Add-Type -AssemblyName System.Windows.Forms
             [System.Windows.Forms.MessageBox]::Show(
-                "Automatic install didn't work on this machine.`n`nObsidian's download page just opened in your browser. Install it manually, then re-run this bootstrap - it'll pick up where we left off.",
-                "Obsidian - manual install",
+                "Paperwik couldn't download Obsidian right now.`n`nThis is almost always a network issue (weak Wi-Fi, firewall, or a temporary outage). Try this:`n`n1. Check your internet connection.`n2. Wait a few minutes.`n3. Re-run the installer:`n   irm https://s0phak1ng.github.io/paperwik/install.ps1 | iex`n`nIf it keeps failing after a couple of tries, send this error to whoever set Paperwik up for you:`n`n$errMsg",
+                "Paperwik - couldn't reach Obsidian",
                 [System.Windows.Forms.MessageBoxButtons]::OK,
-                [System.Windows.Forms.MessageBoxIcon]::Information
+                [System.Windows.Forms.MessageBoxIcon]::Warning
             ) | Out-Null
             exit 1
         }
@@ -1706,7 +1804,9 @@ if ((Test-Path $vaultRoot) -and (Test-Path $pluginManifestFile)) {
                 # Fetch latest release metadata to get the tag and asset download URLs
                 $releaseApi = "https://api.github.com/repos/$repo/releases/latest"
                 $headers = @{ "User-Agent" = "paperwik-installer" }
-                $release = Invoke-RestMethod -Uri $releaseApi -Headers $headers -ErrorAction Stop
+                $release = Invoke-WithRetry -Label "Obsidian plugin '$pluginId' release metadata" -ScriptBlock {
+                    Invoke-RestMethod -Uri $releaseApi -Headers $headers
+                }
                 $tag = $release.tag_name
 
                 # Each release provides main.js, manifest.json, styles.css at
@@ -1716,7 +1816,9 @@ if ((Test-Path $vaultRoot) -and (Test-Path $pluginManifestFile)) {
                     $assetUrl = "$baseUrl/$asset"
                     $assetPath = Join-Path $targetDir $asset
                     try {
-                        Invoke-WebRequest -Uri $assetUrl -OutFile $assetPath -Headers $headers -ErrorAction Stop
+                        Invoke-WithRetry -Label "Obsidian plugin '$pluginId' asset '$asset'" -ScriptBlock {
+                            Invoke-WebRequest -Uri $assetUrl -OutFile $assetPath -Headers $headers
+                        } | Out-Null
                     } catch {
                         # Some plugins omit optional assets (e.g., no styles.css).
                         # Only flag the required ones as failures.
