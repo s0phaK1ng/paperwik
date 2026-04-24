@@ -28,6 +28,17 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.5.1 -- hotfix. v0.5.0's step (c5) programmatic plugin installer
+    had a PowerShell parser bug in its error-handling path: the string
+    "Could not install plugin '$pluginId' from $repo: ..." had $repo:
+    which PS interprets as a PSDrive qualifier ($drivename:path). Only
+    surfaces as a parse-error when the WHOLE script is re-parsed by
+    `irm | iex` on a fresh install -- not during line-by-line dev
+    testing. Fix: wrap $repo in curly braces ${repo}: so the colon
+    is read as literal text, not a drive separator.
+
+    One-line change. No other changes.
+
     v0.5.0 -- Obsidian template rebuild. Transforms the shipped .obsidian/
     from a 27-line stub into a complete pre-configured reading surface:
     7 community plugins pre-downloaded + pre-enabled, a filtered +
@@ -1718,7 +1729,7 @@ if ((Test-Path $vaultRoot) -and (Test-Path $pluginManifestFile)) {
                 }
                 Write-Host "      Installed Obsidian plugin '$pluginId' ($tag)." -ForegroundColor Green
             } catch {
-                Write-Host "      Could not install plugin '$pluginId' from $repo: $($_.Exception.Message)" -ForegroundColor Yellow
+                Write-Host "      Could not install plugin '$pluginId' from ${repo}: $($_.Exception.Message)" -ForegroundColor Yellow
                 # Leave empty plugin dir behind; user can retry by re-running installer.
             }
         }
