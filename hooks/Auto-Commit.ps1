@@ -47,17 +47,37 @@ try {
 
     Push-Location $vault
     try {
-        # Initialize git repo on first run
+        # The installer is responsible for creating .git and the initial
+        # snapshot (install.ps1 step 7(c3)). If .git isn't here, something
+        # went wrong in install; don't try to init from the hook — staging
+        # a fresh vault takes longer than the hook's timeout budget and
+        # would leave a half-initialized repo with a stale index.lock.
         if (-not (Test-Path '.git')) {
-            & git init --quiet 2>$null | Out-Null
-            & git config user.name 'Paperwik Agent' 2>$null | Out-Null
-            & git config user.email 'agent@paperwik.local' 2>$null | Out-Null
-            # Seed with initial commit so future commits have a parent
-            & git add -A 2>$null | Out-Null
-            & git commit --quiet -m 'paperwik: initial snapshot' 2>$null | Out-Null
+            try {
+                $docs = [Environment]::GetFolderPath("MyDocuments")
+                $log = Join-Path $docs 'Paperwik-Diagnostics.log'
+                $ts = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
+                Add-Content -Path $log -Value "[$ts] [Auto-Commit] SKIP: .git missing in $vault — expected installer to create it" -ErrorAction SilentlyContinue
+            } catch {}
+            exit 0
         }
 
-        # Is there anything to commit?
+        # Stale-lock recovery. If a previous git operation was killed
+        # (hook timeout, power loss, user ctrl-c), index.lock can be left
+        # behind, wedging all future git commands. Delete it if it's older
+        # than 30s (safely assumes no live git operation is in flight).
+        $lock = Join-Path $vault '.git\index.lock'
+        if (Test-Path $lock) {
+            try {
+                $age = (Get-Date) - (Get-Item $lock).LastWriteTime
+                if ($age.TotalSeconds -gt 30) {
+                    Remove-Item $lock -Force -ErrorAction SilentlyContinue
+                }
+            } catch {}
+        }
+
+        # Is there anything to commit? (If the repo was just created by the
+        # installer, this is where we pick up agent-side changes.)
         $dirty = (& git status --porcelain 2>$null)
         if (-not $dirty) { exit 0 }
 

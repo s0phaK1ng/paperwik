@@ -65,21 +65,44 @@ function Extract-TextContent {
 
 try {
     $vault = Join-Path $env:USERPROFILE 'Paperwik'
-    if (-not (Test-Path $vault)) { exit 0 }
+    if (-not (Test-Path $vault)) {
+        Append-DiagLog "SKIP: vault not found at $vault"
+        exit 0
+    }
 
     # Read hook payload from stdin
     $payloadRaw = $null
-    try { $payloadRaw = [System.Console]::In.ReadToEnd() } catch {}
-    if (-not $payloadRaw) { exit 0 }
+    try { $payloadRaw = [System.Console]::In.ReadToEnd() } catch {
+        Append-DiagLog "stdin read threw: $($_.Exception.Message)"
+    }
+    if (-not $payloadRaw) {
+        Append-DiagLog "SKIP: no stdin payload received (Desktop may not be piping hook JSON to stdin)"
+        exit 0
+    }
 
     $payload = $null
-    try { $payload = $payloadRaw | ConvertFrom-Json } catch { exit 0 }
-    if (-not $payload) { exit 0 }
+    try { $payload = $payloadRaw | ConvertFrom-Json } catch {
+        Append-DiagLog "SKIP: payload is not valid JSON. First 200 chars: $($payloadRaw.Substring(0, [Math]::Min(200, $payloadRaw.Length)))"
+        exit 0
+    }
+    if (-not $payload) {
+        Append-DiagLog "SKIP: ConvertFrom-Json produced null"
+        exit 0
+    }
 
     $transcriptPath = $payload.transcript_path
     $sessionId      = $payload.session_id
-    if (-not $transcriptPath -or -not (Test-Path $transcriptPath)) { exit 0 }
+    if (-not $transcriptPath) {
+        Append-DiagLog "SKIP: payload has no transcript_path. Keys present: $($payload.PSObject.Properties.Name -join ',')"
+        exit 0
+    }
+    if (-not (Test-Path $transcriptPath)) {
+        Append-DiagLog "SKIP: transcript_path does not exist on disk: $transcriptPath"
+        exit 0
+    }
     if (-not $sessionId) { $sessionId = 'unknown' }
+
+    Append-DiagLog "FIRED: session=$sessionId transcript=$transcriptPath"
 
     # ----- 1. Mirror transcript into vault -----
     $archiveDir = Join-Path $vault '.claude\chat-history'

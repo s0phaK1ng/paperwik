@@ -70,7 +70,7 @@
           {
             "type": "command",
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/Auto-Commit.ps1\"",
-            "timeout": 5
+            "timeout": 15
           }
         ]
       }
@@ -99,7 +99,7 @@
           {
             "type": "command",
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/Chat-Archive.ps1\"",
-            "timeout": 5
+            "timeout": 15
           }
         ]
       }

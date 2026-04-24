@@ -16,6 +16,10 @@
 .claude/.last-update-notes.md
 .claude/.last-update-notes.read.md
 
+# Chat transcript mirror — rewritten every turn by Chat-Archive.ps1. Already
+# on disk for query/recovery; no version-control value per-revision.
+.claude/chat-history/
+
 # Retrieval index — regeneratable from markdown via the rebuild-index skill
 knowledge.db
 knowledge.db-shm

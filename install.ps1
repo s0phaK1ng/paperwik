@@ -28,16 +28,57 @@
     in the terminal-hosted CLI.
 
 .NOTES
-    v0.2.7 — friends-and-family bootstrap. Real silent-autosave now,
-    not just in SKILL.md aspirations. v0.2.6 and earlier had SKILL.md
-    files (auto-file-chat, decision-logger) that looked like they'd
-    silently archive chat + log decisions, but neither was actually
-    wired to a hook — auto-file-chat had disable-model-invocation:true
-    (agent could not invoke it) and no hook called it, decision-logger
-    required explicit agent trigger AND asked the user for permission
-    before writing. Git autosave was mentioned in research but never
-    built. The user's explicit design directive: "remember everything.
-    don't make me ask." v0.2.7 builds the hook-driven silent version.
+    v0.2.8 — friends-and-family bootstrap. Fixes two issues in v0.2.7's
+    silent auto-archive implementation discovered during the first
+    real end-to-end test.
+
+    Issue 1 (critical): Auto-Commit hook timed out during initial
+    snapshot. On a fresh vault, `git add -A` stages knowledge.db
+    (~50 MB binary) plus source files plus the full template tree.
+    With the hook's 5s timeout budget, this was killed mid-operation,
+    leaving a stale .git/index.lock that wedged all future git calls.
+    Every subsequent hook run also failed ("Another git process seems
+    to be running in this repository, or the lock file may be stale").
+
+    Issue 2 (silent): Chat-Archive hook produced no output on real
+    Desktop sessions — chat-history/ remained empty. Manual invocation
+    with a synthetic payload worked, suggesting Desktop may not be
+    piping the hook payload through stdin the same way the CLI does,
+    OR the hook was silently hitting one of several early-exit paths.
+    No log entries from the hook itself to distinguish.
+
+    Changes from v0.2.7:
+      - install.ps1 step 7(c3): NEW. Initialize git repo + first
+        snapshot inside ~/Paperwik after scaffolder + settings
+        refresh. No time pressure here — user is watching install
+        progress, not a hook timeout. Hook's only job going forward
+        is incremental commits, which are fast. Idempotent: skipped
+        if .git already exists from a prior install.
+      - Auto-Commit.ps1: REMOVED the init-in-hook branch. If .git is
+        missing when hook fires, skip with a diagnostic log entry
+        instead of trying to init (would just wedge again). ADDED
+        stale-lock recovery: delete .git/index.lock if older than
+        30 seconds (safely assumes no live git operation in flight).
+        Prevents permanent wedge if a timeout ever does hit.
+      - .gitignore template: added .claude/chat-history/ to the
+        existing ignores. Chat transcript mirror is re-written every
+        turn; no version-control value per-revision. Keeps commits
+        small and fast.
+      - hooks.json: bumped Auto-Commit + Chat-Archive timeouts from
+        5s to 15s. Cheap insurance.
+      - Chat-Archive.ps1: added Append-DiagLog calls on every
+        early-exit path (no stdin, bad JSON, missing transcript_path,
+        transcript file not found). Also FIRED log on successful
+        processing. Next test will either tell us exactly why the
+        hook bailed or confirm it's running silently as designed.
+      - plugin.json + marketplace.json bumped 0.2.7 -> 0.2.8.
+      - No install.ps1 core flow changes beyond the new 7(c3) step.
+
+    Upgrade path: run the one-liner again OR
+        git -C $HOME\.claude\plugins\marketplaces\paperwik pull
+        rm -rf $HOME\Paperwik\.git   # if previous install left a broken one
+        # then in Claude Desktop: + -> Plugins -> paperwik -> Update
+    After Update, Desktop reloads the new hooks.json + scripts.
 
     Changes from v0.2.6:
       - NEW hook: PostToolUse -> Auto-Commit.ps1. After any Write /
@@ -1201,6 +1242,44 @@ if ((Test-Path $templateSettings) -and (Test-Path $vaultRoot)) {
         Write-Host "      Refreshed vault permissions from template (bypassPermissions + broad Bash allow + destructive-op deny)." -ForegroundColor Green
     } catch {
         Write-Host "      Couldn't refresh vault settings.json: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+# --- (c3) Initialize git repo + first snapshot in ~/Paperwik ----------------
+# The PostToolUse Auto-Commit hook (registered in v0.2.7) creates versioned
+# snapshots of every agent edit inside ~/Paperwik/ so the user has undo via
+# git revert. That hook is time-budgeted (15s) so it must NEVER do an
+# initial bulk add on a fresh vault — staging a freshly-scaffolded vault
+# with knowledge.db + other large files takes longer than any reasonable
+# hook timeout and would leave a stale .git/index.lock wedging future
+# commits. We do the init and initial snapshot here, where we can take as
+# long as needed. Idempotent: skipped if .git already exists.
+$vaultGit = Join-Path $vaultRoot '.git'
+if ((Test-Path $vaultRoot) -and (-not (Test-Path $vaultGit))) {
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Write-Host "      Initializing git history in $vaultRoot..." -ForegroundColor DarkGray
+        $prevErr = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        Push-Location $vaultRoot
+        try {
+            & git init --quiet 2>&1 | Out-Null
+            & git config user.name 'Paperwik Agent' 2>&1 | Out-Null
+            & git config user.email 'agent@paperwik.local' 2>&1 | Out-Null
+            & git add -A 2>&1 | Out-Null
+            & git commit --quiet -m 'paperwik: initial snapshot' 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "      Git history initialized (undo via git log/revert inside Paperwik\\)." -ForegroundColor Green
+            } else {
+                Write-Host "      Git init ran but initial commit exit=$LASTEXITCODE (non-fatal; hook will try on first agent edit)." -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "      Git init hit an error: $($_.Exception.Message)" -ForegroundColor Yellow
+        } finally {
+            Pop-Location
+            $ErrorActionPreference = $prevErr
+        }
+    } else {
+        Write-Host "      git not on PATH — skipping vault git init. Auto-Commit hook won't snapshot." -ForegroundColor Yellow
     }
 }
 
