@@ -1,0 +1,154 @@
+{
+  "$comment": "Paperwik ZSC accuracy benchmark — 20 self-contained dad-corpus-representative documents. Used by paperwik-measure-classification to compute project-routing top-1 accuracy and source-type top-1 accuracy. PLACEHOLDER QUALITY: these were drafted at v0.6.0 build time without the user's actual ingest history. Post-first-month, swap in 20 real documents from the user's vault to get a meaningful evaluation signal. Targets: project routing >= 80% top-1, source classification >= 90% top-1.",
+  "version": "0.6.0-placeholder",
+  "expected_projects": [
+    "Cognitive Health",
+    "Family History",
+    "Municipal Bonds",
+    "Omega-3 Research",
+    "Personal Finance",
+    "Home Maintenance"
+  ],
+  "documents": [
+    {
+      "id": "doc-001",
+      "content_excerpt": "We conducted a randomized controlled trial in 1,247 adults aged 60-85 with subjective cognitive decline. Participants were assigned to either the omega-3 supplementation arm (1.4g EPA + 1.0g DHA daily) or matched placebo for 24 months. Primary outcome was change in MMSE score; secondary outcomes included plasma DHA concentration and hippocampal volume on MRI. Results showed a small but statistically significant benefit (p=0.03) in the supplementation arm, though the effect size was below the pre-registered threshold for clinical significance. Methodology limitations included...",
+      "expected_project": "Omega-3 Research",
+      "expected_source_type": "academic",
+      "notes": "RCT methodology paper — should clearly classify as academic with high confidence."
+    },
+    {
+      "id": "doc-002",
+      "content_excerpt": "Five Foods That Boost Brain Health After 60. By Sarah Kim, contributing health writer. As we age, our brains undergo natural changes that can affect memory and cognition. The good news is that what we eat can have a real impact. Here are five foods backed by research that nutritionists recommend for cognitive wellness in older adults: 1. Fatty fish like salmon and mackerel deliver omega-3s critical for brain cell membranes...",
+      "expected_project": "Cognitive Health",
+      "expected_source_type": "article",
+      "notes": "Web journalism — listicle format, byline, journalistic tone."
+    },
+    {
+      "id": "doc-003",
+      "content_excerpt": "MUNICIPAL BOND WEEKLY | March 2026 | Issue #847\n\nIN THIS ISSUE: California GO bonds catch a bid; Houston ISD downgrade watch; reading the Fed's curve.\n\nDear subscriber, this week we're watching three things... [scroll to keep reading] ... To unsubscribe from this newsletter, click here. To manage your preferences, visit your account page. Forwarded to you? Subscribe at MunicipalBondWeekly.com.",
+      "expected_project": "Municipal Bonds",
+      "expected_source_type": "newsletter",
+      "notes": "Classic email newsletter with subscribe/unsubscribe footer."
+    },
+    {
+      "id": "doc-004",
+      "content_excerpt": "@stockanalyst on X: 'Just looked at the Q4 muni issuance numbers and they're wild. CA went heavy on infrastructure bonds — 18% YoY increase. Anyone else seeing this in their portfolio? 👀' Replies: '@bondtrader42: Yeah we're overweight CA right now, the spreads are decent.' '@reti_redux: Be careful, the credit quality on the second-tier issuers is sliding.'",
+      "expected_project": "Municipal Bonds",
+      "expected_source_type": "social",
+      "notes": "X/Twitter thread excerpt — handles, replies, casual tone."
+    },
+    {
+      "id": "doc-005",
+      "content_excerpt": "March 14, 2026. Long day. Took mom to her cardiologist appointment, the news was OK but they want her on a higher dose of the statin. She's worried about the side effects. I told her about that omega-3 paper I read last week — the one Dr. Patel mentioned. We talked about diet changes. Made fish for dinner. She liked it. Tomorrow I need to call the contractor about the porch repair...",
+      "expected_project": "Family History",
+      "expected_source_type": "journal",
+      "notes": "Personal diary entry — date header, first-person, daily-life details."
+    },
+    {
+      "id": "doc-006",
+      "content_excerpt": "Glaze Family Genealogy Reference — Generations Index\n\nGen I: Heinrich Glaze (1847-1923), b. Bavaria, immigrated 1871, settled in Pennsylvania. m. Anna Müller (1851-1918).\nGen II: Karl Glaze (1879-1948), b. Pittsburgh PA. m. Elizabeth O'Brien (1882-1955). Children: Robert, Mary, James.\nGen III: Robert Glaze (1908-1981) ... [continued in Glaze-Family-Tree.md]",
+      "expected_project": "Family History",
+      "expected_source_type": "reference",
+      "notes": "Genealogy reference table — structured lookup, dates, citations."
+    },
+    {
+      "id": "doc-007",
+      "content_excerpt": "Bouchard et al. (2024) systematic review of 47 trials on dietary supplementation for mild cognitive impairment found heterogeneous effect sizes across compounds. Omega-3 fatty acids (k=12 trials, n=8,432) showed pooled SMD = 0.21 (95% CI 0.08-0.34) for global cognition outcomes. Vitamin D supplementation (k=9 trials, n=4,118) showed no significant effect. The review noted significant publication bias for omega-3 studies (Egger's test p=0.04), suggesting...",
+      "expected_project": "Omega-3 Research",
+      "expected_source_type": "academic",
+      "notes": "Systematic review excerpt — meta-analytic statistics, citations."
+    },
+    {
+      "id": "doc-008",
+      "content_excerpt": "How to Refinance Your Mortgage in a High-Rate Environment. Three years ago, rates were under 3%. Today they're north of 7%. So why would anyone refinance? In some cases, it actually makes sense. This piece walks through three scenarios where refinancing today still pencils out — even with the higher rates...",
+      "expected_project": "Personal Finance",
+      "expected_source_type": "article",
+      "notes": "Financial journalism article."
+    },
+    {
+      "id": "doc-009",
+      "content_excerpt": "FINANCE FRIDAY | Issue 312 | The Week in Personal Finance\n\nThis week: 401(k) contribution limits jumped, the Fed signaled, and a reader asks about Roth conversions...\n\nFollow us on X | LinkedIn | Manage subscription | Unsubscribe instantly",
+      "expected_project": "Personal Finance",
+      "expected_source_type": "newsletter",
+      "notes": "Personal finance newsletter."
+    },
+    {
+      "id": "doc-010",
+      "content_excerpt": "April 2, 2026. Spent the morning replacing the kitchen faucet — the cold water valve was finally beyond saving. Took longer than expected because the supply lines were corroded. Three trips to the hardware store. Mom kept making coffee for me. The new faucet works great. Need to clean the old caulking around the sink before it gets worse...",
+      "expected_project": "Home Maintenance",
+      "expected_source_type": "journal",
+      "notes": "Home-improvement journal entry — first-person, dated."
+    },
+    {
+      "id": "doc-011",
+      "content_excerpt": "Faucet Replacement Reference — Standard Single-Hole Kitchen Faucet\n\n1. Tools needed: basin wrench, adjustable wrench, plumber's putty, supply line connectors (1/2\" or 3/8\"), bucket.\n2. Shut off water at supply valves under sink. Open faucet to release pressure.\n3. Disconnect supply lines (basin wrench).\n4. Disconnect faucet body from sink (mounting nuts under sink).\n5. Install new faucet per manufacturer instructions...",
+      "expected_project": "Home Maintenance",
+      "expected_source_type": "reference",
+      "notes": "How-to reference manual — numbered steps, tool list."
+    },
+    {
+      "id": "doc-012",
+      "content_excerpt": "Smith and Jones (2025) examined the relationship between APOE4 status and dietary omega-3 effectiveness in a prospective cohort of 2,847 cognitively normal adults followed for 8 years. Carriers of one or two APOE4 alleles showed no benefit from high omega-3 intake (HR 1.02, 95% CI 0.89-1.18 for incident MCI), while non-carriers showed significant protection (HR 0.74, 95% CI 0.64-0.86). This gene-diet interaction has implications for personalized supplementation guidance...",
+      "expected_project": "Omega-3 Research",
+      "expected_source_type": "academic",
+      "notes": "Prospective cohort study — APOE4-stratified analysis."
+    },
+    {
+      "id": "doc-013",
+      "content_excerpt": "@MattGlaze: 'Just hit a wall trying to figure out my mom's Medicare Part D options. Why is this so confusing?' Reply from @retirementhelper: 'Ha, you're not alone. Have you tried the Medicare.gov plan finder? Filter by her current meds.' @MattGlaze: 'Yeah, but the formularies don't match what her pharmacy has on file...'",
+      "expected_project": "Personal Finance",
+      "expected_source_type": "social",
+      "notes": "Social media exchange — personal-finance/Medicare topic, informal."
+    },
+    {
+      "id": "doc-014",
+      "content_excerpt": "Key Cognitive Tests Reference\n\nMMSE (Mini-Mental State Examination): 30-point screening, cutoff <24 suggests cognitive impairment.\nMoCA (Montreal Cognitive Assessment): 30-point, more sensitive than MMSE for MCI; cutoff <26.\nGPCOG: General Practitioner Assessment of Cognition; designed for primary care.\nADAS-Cog: Used in Alzheimer's research trials.\nDigit Span: working memory subtest.",
+      "expected_project": "Cognitive Health",
+      "expected_source_type": "reference",
+      "notes": "Reference glossary of cognitive tests."
+    },
+    {
+      "id": "doc-015",
+      "content_excerpt": "GENEALOGY DIGEST | March 2026 | Issue 184\n\nThis month: New Pennsylvania immigration records added to FamilySearch; advanced DNA matching tutorial; reader question about Irish parish records.\n\nMember benefits | Forum access | Unsubscribe",
+      "expected_project": "Family History",
+      "expected_source_type": "newsletter",
+      "notes": "Genealogy hobbyist newsletter."
+    },
+    {
+      "id": "doc-016",
+      "content_excerpt": "I've been tracing my paternal great-grandfather's immigration records. Manifest from the SS Friesland, arriving New York Sept 12, 1871. Listed as 'Heinrich Glaze, age 24, occupation: cooper, origin: Bavaria.' Cross-referenced with the 1880 US Census which has him in Allegheny Co., PA, married to Anna née Müller, working as a cooper at the Westinghouse plant. Their first child Karl was born 1879...",
+      "expected_project": "Family History",
+      "expected_source_type": "academic",
+      "notes": "Borderline case — feels like a genealogy research note. Could classify as 'reference' or 'academic'. Most likely 'academic' given the research-paper structure (citations, primary sources)."
+    },
+    {
+      "id": "doc-017",
+      "content_excerpt": "Why I'm Skeptical of Ultra-High-Dose Omega-3 Studies. There's been a lot of excitement about new trials testing 4g+/day omega-3 for cognitive outcomes. But I think people are missing something: the placebo arms in these trials are usually getting roughly the omega-3 levels you'd expect from a 'normal' diet — not zero. That makes the comparison...",
+      "expected_project": "Omega-3 Research",
+      "expected_source_type": "article",
+      "notes": "Opinion-piece blog about omega-3 research methodology."
+    },
+    {
+      "id": "doc-018",
+      "content_excerpt": "March 28, 2026. Quiet day. Read for a few hours — finished that book on hippocampal aging. Was thinking about how much my own memory has changed over the last decade. Some things sharper, some things blurrier. Hard to tell what's normal aging vs. what I should worry about. Made a list of things I want to ask my doctor next visit. Lunch with Tom — he asked about mom...",
+      "expected_project": "Cognitive Health",
+      "expected_source_type": "journal",
+      "notes": "Self-reflection journal — borderline cognitive-health/personal."
+    },
+    {
+      "id": "doc-019",
+      "content_excerpt": "Schedule of California Municipal General Obligation Bond Series 2026A\n\nDated Date: April 1, 2026\nFinal Maturity: April 1, 2046\nDenomination: $5,000\nRedemption: Optional call after April 1, 2034\nUse of Proceeds: Capital improvements to State University System\nRatings: Moody's: Aa2; S&P: AA-; Fitch: AA\nUnderwriter: Goldman Sachs",
+      "expected_project": "Municipal Bonds",
+      "expected_source_type": "reference",
+      "notes": "Bond prospectus reference data — structured fields."
+    },
+    {
+      "id": "doc-020",
+      "content_excerpt": "Bond Trader Daily Roundup | April 1, 2026\n\nThe muni market opened mixed today as traders digested fresh issuance from California ($1.2B GO) and Texas ($800M revenue bonds for transportation). Spreads tightened on the CA issue after strong demand from retail accounts...",
+      "expected_project": "Municipal Bonds",
+      "expected_source_type": "article",
+      "notes": "Daily market commentary — journalistic, financial-news article."
+    }
+  ]
+}

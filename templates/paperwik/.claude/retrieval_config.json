@@ -28,6 +28,9 @@
     "file_into_closest_above_cosine": 0.55,
     "start_with_single_project": true,
     "learn_from_user_overrides": true,
-    "archive_after_days_inactive": 180
+    "archive_after_days_inactive": 180,
+    "zsc_enabled": true,
+    "zsc_routing_threshold": 0.70,
+    "zsc_routing_margin": 0.15
   }
 }

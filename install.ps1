@@ -28,6 +28,45 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.6.0 -- zero-shot classification routing. Adds a ZSC-first branch
+    to project_router.py that runs DeBERTa-v3-base-zeroshot-v2.0-c (ONNX,
+    INT8-quantized lazily on first ingest) against per-project descriptive
+    labels stored at Vault/Projects/<Project>/.paperwik/label.txt. If the
+    top match clears 0.70 probability AND beats the second by >= 0.15
+    margin, that project wins. Otherwise the existing cosine-centroid path
+    runs (v0.5.x behavior preserved as fallback).
+
+    Also adds source-type classification (academic / article / newsletter /
+    social / journal / reference) at a new paperwik-ingest Step 1.5,
+    BEFORE subagent dispatch, so the subagent's extraction prompt is
+    tailored to the document's shape (academic -> methods+findings+limits;
+    newsletter -> drop subscribe chrome; etc.).
+
+    First ingest after upgrade pays a one-time ~30-60s cost: classify.py
+    downloads the 738 MB FP32 ONNX from gincioks/* on Hugging Face, runs
+    onnxruntime.quantization.quantize_dynamic to produce ~150 MB INT8,
+    caches the INT8 to ~/.cache/huggingface/hub/.paperwik-int8/, then
+    deletes the FP32 to reclaim ~600 MB. All subsequent classify() calls
+    skip download + quantization.
+
+    Hard constraint preserved: no new Anthropic API dependency. The
+    existing optional ANTHROPIC_API_KEY fallback for project-name
+    generation in project_router.py is unchanged. Local ONNX only.
+
+    New install.ps1 substep (c9): append-only JSON merge for the three
+    ZSC keys (zsc_enabled, zsc_routing_threshold, zsc_routing_margin)
+    into vault retrieval_config.json's existing project_router block.
+    Mirrors the proven settings.local.json pattern (step c4) — preserves
+    user edits, idempotent on re-run, UTF-8 no-BOM, depth-10.
+
+    PEP-723 deps added to project_router.py (uv-run reads entry-script
+    headers only, not transitive imports): onnxruntime>=1.16.3,
+    tokenizers>=0.15.0, numpy>=1.26.0, huggingface-hub>=0.20.0. Existing
+    fastembed and anthropic deps preserved.
+
+    Pre-commit parse-tested per memory rule (Get-Content -Raw -Encoding
+    UTF8 + [ScriptBlock]::Create). PARSE OK.
+
     v0.5.3 -- two live-install bugs Matt hit in the sandbox.
 
     Bug 1: Obsidian plugin 'marp-slides' at MSzturc/marp-slides was
@@ -1958,6 +1997,82 @@ try {
     Write-Host "      Enabled paperwik.css snippet in Obsidian appearance settings." -ForegroundColor Green
 } catch {
     Write-Host "      Couldn't enable paperwik.css snippet: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+# --- (c9) Append-merge ZSC keys into vault retrieval_config.json (v0.6.0) ----
+# v0.6.0 adds zero-shot classification routing. Three new keys live INSIDE
+# the existing project_router block in retrieval_config.json:
+#   zsc_enabled            (bool, default true)
+#   zsc_routing_threshold  (float, default 0.70)
+#   zsc_routing_margin     (float, default 0.15)
+#
+# Why an append-only merge instead of Copy-Item from template? Like
+# settings.local.json (step c4), retrieval_config.json may have user edits
+# from earlier paperwik versions (e.g., a custom rrf_weights tuning). We
+# CANNOT overwrite — we'd clobber their tuning. We surgically insert/update
+# ONLY the three ZSC keys inside the project_router block, leave every
+# other key (vector_search, bm25_search, rrf_weights, embedding_model, etc.)
+# untouched, and write back UTF-8 no-BOM at depth 10.
+#
+# Idempotent: re-running this step on an already-upgraded retrieval_config
+# overwrites the three keys with the latest paperwik defaults. If the user
+# wants different ZSC values they should edit the file AFTER running the
+# installer (or just disable ZSC by setting zsc_enabled=false).
+$retrievalConfigPath = Join-Path $vaultRoot ".claude\retrieval_config.json"
+if (Test-Path $vaultRoot) {
+    try {
+        $vaultClaudeDir = Split-Path -Parent $retrievalConfigPath
+        if (-not (Test-Path $vaultClaudeDir)) {
+            New-Item -ItemType Directory -Path $vaultClaudeDir -Force | Out-Null
+        }
+
+        $rcfg = [PSCustomObject]@{}
+        if (Test-Path $retrievalConfigPath) {
+            try {
+                $raw = Get-Content $retrievalConfigPath -Raw -ErrorAction SilentlyContinue
+                if ($raw -and $raw.Trim()) {
+                    $parsed = $raw | ConvertFrom-Json -ErrorAction Stop
+                    if ($parsed -is [PSCustomObject]) { $rcfg = $parsed }
+                }
+            } catch {
+                Write-Host "      Existing retrieval_config.json wasn't valid JSON; replacing with template defaults." -ForegroundColor Yellow
+            }
+            # Back up before mutation
+            $rcfgBak = "$retrievalConfigPath.bak-$(Get-Date -Format 'yyyyMMddHHmmss')"
+            Copy-Item $retrievalConfigPath $rcfgBak -Force
+        } else {
+            # First install of v0.6.0+: copy the full template and skip the merge
+            $templateRcfg = Join-Path $paperwikDir "templates\paperwik\.claude\retrieval_config.json"
+            if (Test-Path $templateRcfg) {
+                Copy-Item $templateRcfg $retrievalConfigPath -Force
+                Write-Host "      Installed template retrieval_config.json (with ZSC defaults)." -ForegroundColor DarkGray
+            }
+            # Re-load what we just copied so we still write UTF-8 no-BOM below
+            if (Test-Path $retrievalConfigPath) {
+                try {
+                    $rcfg = (Get-Content $retrievalConfigPath -Raw -ErrorAction Stop) | ConvertFrom-Json -ErrorAction Stop
+                } catch {
+                    $rcfg = [PSCustomObject]@{}
+                }
+            }
+        }
+
+        # Ensure project_router nested block exists
+        if (-not $rcfg.PSObject.Properties['project_router'] -or -not $rcfg.project_router) {
+            $rcfg | Add-Member -NotePropertyName 'project_router' -NotePropertyValue ([PSCustomObject]@{}) -Force
+        }
+
+        # Insert/update ONLY the three ZSC keys; leave existing keys alone.
+        $rcfg.project_router | Add-Member -NotePropertyName 'zsc_enabled' -NotePropertyValue $true -Force
+        $rcfg.project_router | Add-Member -NotePropertyName 'zsc_routing_threshold' -NotePropertyValue 0.70 -Force
+        $rcfg.project_router | Add-Member -NotePropertyName 'zsc_routing_margin' -NotePropertyValue 0.15 -Force
+
+        $rcfgJson = $rcfg | ConvertTo-Json -Depth 10
+        [System.IO.File]::WriteAllText($retrievalConfigPath, $rcfgJson, (New-Object System.Text.UTF8Encoding $false))
+        Write-Host "      Merged ZSC routing keys into vault retrieval_config.json (zsc_enabled=true)." -ForegroundColor Green
+    } catch {
+        Write-Host "      Couldn't merge ZSC keys into retrieval_config.json: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 }
 
 # --- (d) Register vault in Obsidian's vault list -----------------------------

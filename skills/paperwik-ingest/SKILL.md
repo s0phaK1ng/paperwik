@@ -58,16 +58,53 @@ Glob `Vault/Inbox/` for files newer than the wiki's last ingest log entry (check
 `log.md` tail). If multiple candidates, ask the user which one. If exactly one
 recent file, proceed.
 
+### 1.5. Classify the source TYPE (v0.6.0)
+
+Before delegating to the subagent, run zero-shot classification on the
+source so the subagent's extraction prompt can be tailored to the document's
+shape. This is fast (~100-300 ms after first-run model warmup) and the
+result feeds three places downstream:
+
+```bash
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+uv run "$PAPERWIK_PLUGIN/scripts/source_classifier.py" \
+    --file "$INBOX_FILE" \
+    --filename "$(basename "$INBOX_FILE")"
+```
+
+The classifier prints JSON: `{"type": "...", "confidence": 0.xx}`. Capture
+both. Type is one of: `academic`, `article`, `newsletter`, `social`,
+`journal`, `reference`. If confidence < 0.40, treat type as `article`
+(the safe default) but note the low confidence in your final report.
+
+**First ingest only**: the classifier downloads (~738 MB) + quantizes (~150 MB
+final) the ONNX model. Takes ~30-60 seconds and is silent. After that, every
+subsequent ingest reuses the cached INT8 model.
+
 ### 2. Delegate to a subagent
 
 Ingest is token-heavy. Spawn a sub-agent via the Agent tool to do the heavy
-reading and extraction. Prompt it to:
+reading and extraction. **Parameterize the subagent's prompt by the source
+type from Step 1.5** — the extraction shape varies by document format:
+
+| Type | Subagent extraction focus |
+|------|---------------------------|
+| `academic` | methodology, findings, limitations, datasets, citations |
+| `article` | thesis sentence + key arguments + concrete examples + author POV |
+| `newsletter` | summary stripped of subscribe/footer/ad chrome; the actionable items only |
+| `social` | preserve verbatim as a quoted block; capture author + platform + thread context |
+| `journal` | personal-journaling structure: date, topics-of-the-day, mood/tone |
+| `reference` | searchable index style — minimal editing; capture canonical terms + cross-refs |
+
+Then ask the subagent to:
 
 - Read the full source file.
-- Identify the key claims, findings, methods, entities, and cited sources.
+- Identify the key claims, findings, methods, entities, and cited sources
+  (per the type-specific focus above).
 - Draft a summary page (200-500 words) with a title, YAML frontmatter
   (`created`, `source`, `tags`, `source_type`), a 1-paragraph abstract, and
-  the key points as a bullet list.
+  the key points as a bullet list. The `source_type` value MUST equal the
+  type from Step 1.5 — do not let the subagent override it.
 - Identify 5–20 distinct entities worth tracking (researchers, concepts,
   papers, organizations).
 - Return those as structured data to the parent.
@@ -88,10 +125,37 @@ PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperw
 uv run "$PAPERWIK_PLUGIN/scripts/project_router.py" "$INBOX_FILE"
 ```
 
-The router returns JSON with `project_name`, `project_id`, `is_new`, and
-`max_similarity`. Respect its decision silently — do not ask the user where to
-file. If `is_new=true`, announce the new folder: *"I've created a new project
-folder called 'X' because this source doesn't fit any existing topic closely."*
+The router returns JSON with `project_name`, `project_id`, `is_new`,
+`max_similarity`, and (v0.6.0) `routed_via`. The `routed_via` field is
+`"zsc"`, `"cosine"`, or `"first"` — useful for the diagnostics log but
+not for user messaging. Respect the routing decision silently — do not ask
+the user where to file. If `is_new=true`, announce the new folder: *"I've
+created a new project folder called 'X' because this source doesn't fit
+any existing topic closely."*
+
+#### 3a. New-project label generation (v0.6.0)
+
+When `is_new=true`, the router has created a new project folder + an empty
+`Vault/Projects/<Project>/.paperwik/label.txt` placeholder. Generate a
+ONE-SENTENCE descriptive label and write it to that file. The label is what
+the ZSC router compares future sources against, so the more topical and
+specific the better:
+
+- Bad:  `Notes about science`
+- Good: `Research on dietary interventions for cognitive decline in adults over 60.`
+
+Write the label as plain UTF-8 text, one sentence, no trailing newline,
+60-180 characters. Bash:
+
+```bash
+LABEL_FILE="$USERPROFILE/Paperwik/Vault/Projects/<Project>/.paperwik/label.txt"
+printf '%s' 'Research on dietary interventions for cognitive decline in adults over 60.' > "$LABEL_FILE"
+```
+
+Existing projects (created before v0.6.0 or whose label.txt is empty) DON'T
+participate in ZSC routing — they fall through to cosine. This is fine; the
+label gets generated organically the next time a source lands in that
+project. No retroactive labeling pass needed.
 
 ### 4. Write the summary page
 

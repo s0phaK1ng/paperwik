@@ -22,6 +22,7 @@
     "knowledge.db-journal",
     "knowledge.db-wal",
     "knowledge.db-shm",
-    ".scaffolded"
+    ".scaffolded",
+    ".paperwik"
   ]
 }

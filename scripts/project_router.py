@@ -3,26 +3,54 @@
 # dependencies = [
 #     "fastembed>=0.4.0",
 #     "anthropic>=0.40.0",
+#     "onnxruntime>=1.16.3",
+#     "tokenizers>=0.15.0",
+#     "numpy>=1.26.0",
+#     "huggingface-hub>=0.20.0",
 # ]
 # ///
 #
 # Python pinned to 3.12.x for wheel compatibility. See embeddings.py
 # for the detailed reason (py-rust-stemmers / MSVC-link shadow).
+#
+# v0.6.0 added the bottom four deps for the ZSC routing branch (classify.py).
+# The router itself doesn't import classify directly — it imports lazily
+# inside _zsc_classify() — but `uv run` resolves the entry-script PEP-723
+# header only, never transitive imports. So when ingest invokes
+# `uv run project_router.py ...`, every classify dep MUST live here.
+# anthropic stays for the optional naming fallback (still pre-v0.6 behavior).
 """
-project_router.py — Two-band embedding-similarity router for Paperwik.
+project_router.py — Hybrid ZSC-first / cosine-fallback router for Paperwik.
 
 On every new source or major topic shift:
     1. Embed the content via fastembed (nomic-embed-text-v1.5).
-    2. Compare against cached project centroids in the projects table.
-    3. If max similarity < 0.55 → create a new project with an auto-generated name.
-    4. Else → file into the closest match, no question asked.
-    5. When user overrides (moves content between folders), update centroids.
+    2. v0.6+: if zsc_enabled AND >=2 projects exist with descriptive labels,
+       run zero-shot classification (multi-label) against per-project labels
+       at Vault/Projects/<Project>/.paperwik/label.txt. If top probability
+       >= zsc_routing_threshold AND margin over second >= zsc_routing_margin,
+       FILE into top-match project. Else fall through.
+    3. Compare embedding against cached project centroids.
+    4. If max similarity < 0.55 → create a new project with an auto-generated
+       name.
+    5. Else → file into the closest match, no question asked.
+    6. When user overrides (moves content between folders), update centroids.
 
 Start condition: if zero projects exist, ALWAYS create the first project for
 the first content ingested — no comparison needed.
 
 Ported concept: CoWork's multi-tenant project scoping pattern. Implementation
 is greenfield since CoWork uses PostgreSQL and doesn't need auto-routing.
+
+v0.6.0 design notes:
+    * route_content() signature is unchanged. The ZSC branch is purely
+      additive — disabled callers see identical pre-v0.6 behavior.
+    * The optional Anthropic-SDK name-generation fallback at
+      generate_project_name() STAYS — paperwik is dad-on-Claude-Pro, but
+      ANTHROPIC_API_KEY is allowed (and recommended) for higher-quality
+      project names.
+    * ZSC is an OPTIONAL routing accelerant; cosine remains the safety net.
+      If classify.py crashes (corrupted INT8 cache, bad ONNX session, etc.)
+      we silently fall through to cosine — never block ingest on ZSC errors.
 """
 
 from __future__ import annotations
@@ -49,8 +77,175 @@ except ImportError:
 #  Thresholds (matches retrieval_config.json → project_router)
 # --------------------------------------------------------------------------- #
 
+# v0.5.x cosine-band defaults. Used as fallback when retrieval_config.json
+# is missing or unparseable.
 AUTO_SPLIT_BELOW = 0.55
 FILE_INTO_CLOSEST_ABOVE = 0.55   # one threshold — no ambiguous middle band
+
+# v0.6.0 ZSC routing defaults. Loaded from retrieval_config.json's nested
+# project_router block at runtime via _load_zsc_config(); these constants
+# are the fallback when the config file is absent or corrupted.
+ZSC_ENABLED_DEFAULT = True
+ZSC_ROUTING_THRESHOLD_DEFAULT = 0.70  # top match must clear this to win
+ZSC_ROUTING_MARGIN_DEFAULT = 0.15     # top must beat 2nd by >= this margin
+
+
+# --------------------------------------------------------------------------- #
+#  retrieval_config.json loading (v0.6.0)
+# --------------------------------------------------------------------------- #
+
+def _retrieval_config_path() -> Path:
+    """Resolve the per-vault retrieval_config.json path.
+
+    Paperwik installs ship the canonical config at
+    ~/Paperwik/.claude/retrieval_config.json. Older installs may have it at
+    ~/Paperwik/Vault/.claude/retrieval_config.json (legacy template
+    location); we check both. The first hit wins.
+    """
+    user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
+    paperwik_root = user_profile / "Paperwik"
+    candidates = [
+        paperwik_root / ".claude" / "retrieval_config.json",
+        paperwik_root / "Vault" / ".claude" / "retrieval_config.json",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    # Return the canonical path even if it doesn't exist; caller will fall back.
+    return candidates[0]
+
+
+def _load_zsc_config() -> dict[str, Any]:
+    """Read retrieval_config.json and return ZSC routing config.
+
+    Returns a dict with keys:
+        zsc_enabled            (bool)
+        zsc_routing_threshold  (float)
+        zsc_routing_margin     (float)
+
+    On any parse error or missing file, returns the hardcoded defaults so
+    the router never crashes on bad config.
+    """
+    path = _retrieval_config_path()
+    if not path.exists():
+        return {
+            "zsc_enabled": ZSC_ENABLED_DEFAULT,
+            "zsc_routing_threshold": ZSC_ROUTING_THRESHOLD_DEFAULT,
+            "zsc_routing_margin": ZSC_ROUTING_MARGIN_DEFAULT,
+        }
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        router_block = (cfg.get("project_router") or {}) if isinstance(cfg, dict) else {}
+        return {
+            "zsc_enabled": bool(router_block.get("zsc_enabled", ZSC_ENABLED_DEFAULT)),
+            "zsc_routing_threshold": float(
+                router_block.get("zsc_routing_threshold", ZSC_ROUTING_THRESHOLD_DEFAULT)
+            ),
+            "zsc_routing_margin": float(
+                router_block.get("zsc_routing_margin", ZSC_ROUTING_MARGIN_DEFAULT)
+            ),
+        }
+    except (OSError, json.JSONDecodeError, ValueError, TypeError):
+        # Corrupt config -> silently fall back to defaults. Router must NEVER
+        # crash on user-edited retrieval_config.json.
+        return {
+            "zsc_enabled": ZSC_ENABLED_DEFAULT,
+            "zsc_routing_threshold": ZSC_ROUTING_THRESHOLD_DEFAULT,
+            "zsc_routing_margin": ZSC_ROUTING_MARGIN_DEFAULT,
+        }
+
+
+# --------------------------------------------------------------------------- #
+#  ZSC routing helpers (v0.6.0)
+# --------------------------------------------------------------------------- #
+
+def _project_label_path(project_name: str) -> Path:
+    """Resolve the per-project descriptive-label path."""
+    user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
+    return (
+        user_profile / "Paperwik" / "Vault" / "Projects"
+        / project_name / ".paperwik" / "label.txt"
+    )
+
+
+def _read_project_label(project_name: str) -> str | None:
+    """Return the descriptive label for a project, or None if missing/empty.
+
+    A non-empty label is REQUIRED for the project to participate in ZSC
+    routing. Projects without label.txt fall through to cosine.
+    """
+    p = _project_label_path(project_name)
+    if not p.exists():
+        return None
+    try:
+        text = p.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text or None
+
+
+def _zsc_classify(
+    content: str,
+    projects_with_labels: list[tuple[dict[str, Any], str]],
+    threshold: float,
+    margin: float,
+) -> dict[str, Any] | None:
+    """Run ZSC against per-project labels; return top match if gate passes.
+
+    Args:
+        content: source text (already truncated by caller).
+        projects_with_labels: list of (project_dict, label_string) pairs.
+        threshold: minimum top-match probability to win.
+        margin: minimum gap between top and 2nd-best probability.
+
+    Returns:
+        The winning project dict if both gates pass, else None.
+
+    Failure modes:
+        * Any exception from classify.py -> return None (caller falls back
+          to cosine). Router must never block ingest on ZSC errors.
+        * Fewer than 2 labeled projects -> return None (margin gate is
+          ill-defined with one candidate).
+    """
+    if len(projects_with_labels) < 2:
+        return None
+
+    try:
+        # Lazy import: classify.py is heavy (onnxruntime, ~150 MB INT8 model
+        # download on first call). Don't pay that cost when ZSC is disabled.
+        from classify import classify as zsc_classify_fn  # type: ignore
+    except ImportError:
+        return None
+
+    labels = [label for (_, label) in projects_with_labels]
+    try:
+        ranked = zsc_classify_fn(
+            text=content,
+            labels=labels,
+            multi_label=True,  # independent per-label entailment scores
+        )
+    except Exception:
+        # Corrupted ONNX, network error during first download, etc.
+        # Cosine fallback is always available.
+        return None
+
+    if not ranked or len(ranked) < 2:
+        return None
+
+    top_label, top_prob = ranked[0]
+    _, second_prob = ranked[1]
+
+    if top_prob < threshold:
+        return None
+    if (top_prob - second_prob) < margin:
+        return None
+
+    # Map winning label back to its project.
+    for proj, label in projects_with_labels:
+        if label == top_label:
+            return proj
+    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -244,7 +439,22 @@ def route_content(
 ) -> dict[str, Any]:
     """Decide which project a new piece of content belongs to.
 
-    Returns {"project_name": str, "project_id": int, "is_new": bool, "max_similarity": float}.
+    v0.6.0 hybrid routing:
+      1. ZSC-first (if zsc_enabled AND >=2 projects have descriptive labels):
+         multi-label entailment vs. per-project labels. If top >= threshold
+         AND (top - 2nd) >= margin, return the top match (no centroid update —
+         ZSC matches don't tell us anything about embedding-space drift).
+      2. Cosine fallback (always): existing v0.5.x behavior. New project if
+         max similarity < AUTO_SPLIT_BELOW; else file into closest + blend.
+
+    Returns {"project_name": str, "project_id": int, "is_new": bool,
+             "max_similarity": float, "routed_via": str}.
+
+    The "routed_via" key is new in v0.6.0:
+        "zsc"    -- the ZSC branch fired and won
+        "cosine" -- fell through to cosine (either ZSC disabled, no labels,
+                    gate failed, or ZSC errored out)
+        "first"  -- first-ever project, no routing happened
     """
     if content_embedding is None:
         content_embedding = embed_doc(content)
@@ -255,9 +465,48 @@ def route_content(
         # First-ever project: create it, no comparison
         name = generate_project_name(content, api_key=api_key)
         pid = _create_project(conn, name, content_embedding)
-        return {"project_name": name, "project_id": pid, "is_new": True, "max_similarity": 0.0}
+        return {
+            "project_name": name,
+            "project_id": pid,
+            "is_new": True,
+            "max_similarity": 0.0,
+            "routed_via": "first",
+        }
 
-    # Compare against each project's centroid
+    # ----- ZSC branch (v0.6.0) ----------------------------------------------
+    zsc_cfg = _load_zsc_config()
+    if zsc_cfg["zsc_enabled"]:
+        labeled = []
+        for p in projects:
+            label = _read_project_label(p["name"])
+            if label:
+                labeled.append((p, label))
+        if len(labeled) >= 2:
+            zsc_match = _zsc_classify(
+                content=content,
+                projects_with_labels=labeled,
+                threshold=zsc_cfg["zsc_routing_threshold"],
+                margin=zsc_cfg["zsc_routing_margin"],
+            )
+            if zsc_match is not None:
+                # ZSC won. Update activity but NOT centroid — embedding-space
+                # learning still requires an embedding-space match signal.
+                _touch_activity(conn, zsc_match["id"])
+                # Compute the cosine for transparency in the return value.
+                if zsc_match.get("centroid"):
+                    sim = cosine(content_embedding, zsc_match["centroid"])
+                else:
+                    sim = 0.0
+                return {
+                    "project_name": zsc_match["name"],
+                    "project_id": zsc_match["id"],
+                    "is_new": False,
+                    "max_similarity": float(sim),
+                    "routed_via": "zsc",
+                }
+        # else: <2 labeled projects, fall through silently to cosine.
+
+    # ----- Cosine fallback (pre-v0.6 behavior, unchanged) -------------------
     scored = []
     for p in projects:
         if p["centroid"] is None:
@@ -269,7 +518,13 @@ def route_content(
         # Defensive: all existing projects lack centroids (shouldn't happen in practice)
         name = generate_project_name(content, api_key=api_key)
         pid = _create_project(conn, name, content_embedding)
-        return {"project_name": name, "project_id": pid, "is_new": True, "max_similarity": 0.0}
+        return {
+            "project_name": name,
+            "project_id": pid,
+            "is_new": True,
+            "max_similarity": 0.0,
+            "routed_via": "cosine",
+        }
 
     scored.sort(key=lambda x: x[0], reverse=True)
     top_sim, top_proj = scored[0]
@@ -278,7 +533,13 @@ def route_content(
         # Create a new project
         name = generate_project_name(content, api_key=api_key)
         pid = _create_project(conn, name, content_embedding)
-        return {"project_name": name, "project_id": pid, "is_new": True, "max_similarity": top_sim}
+        return {
+            "project_name": name,
+            "project_id": pid,
+            "is_new": True,
+            "max_similarity": top_sim,
+            "routed_via": "cosine",
+        }
 
     # File into closest match. Blend the content embedding into the centroid so it learns.
     _update_centroid_blend(conn, top_proj["id"], top_proj["centroid"], content_embedding)
@@ -288,6 +549,7 @@ def route_content(
         "project_id": top_proj["id"],
         "is_new": False,
         "max_similarity": top_sim,
+        "routed_via": "cosine",
     }
 
 
@@ -323,6 +585,22 @@ def _create_project(conn: sqlite3.Connection, name: str, centroid: list[float]) 
     user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
     folder = user_profile / "Paperwik" / "Vault" / "Projects" / name
     folder.mkdir(parents=True, exist_ok=True)
+
+    # v0.6.0: create the per-project ZSC metadata folder + empty label.txt
+    # placeholder. The paperwik agent fills this in on first ingest with a
+    # one-sentence descriptive expansion (which the ZSC router reads on
+    # subsequent ingests). We CREATE the file here even if empty so the
+    # agent has a stable file path to write to without worrying about
+    # parent-folder creation later.
+    paperwik_meta = folder / ".paperwik"
+    paperwik_meta.mkdir(parents=True, exist_ok=True)
+    label_file = paperwik_meta / "label.txt"
+    if not label_file.exists():
+        # Empty file — agent's responsibility to populate at first-ingest
+        # time. ZSC routing skips projects whose label.txt is empty (see
+        # _read_project_label), so an unfilled placeholder simply means
+        # this project doesn't participate in ZSC until the agent labels it.
+        label_file.write_text("", encoding="utf-8")
 
     return int(cur.lastrowid)
 
