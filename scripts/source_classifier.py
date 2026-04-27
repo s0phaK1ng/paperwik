@@ -136,10 +136,28 @@ def classify_source_type(
     label_keys = list(SOURCE_TYPES.keys())
     label_phrases = [SOURCE_TYPES[k] for k in label_keys]
 
+    # v0.6.8: switched from multi_label=False (softmax across labels) to
+    # multi_label=True (raw independent entailment probabilities, then argmax).
+    # The v0.6.7 sandbox showed that softmax-across-labels of 6 entailment
+    # probabilities in [0, 1] barely sharpens the distribution -- even
+    # when the model gave the right type the highest entailment score, the
+    # softmax output hovered at ~0.167 (uniform random with 6 labels) and
+    # tripped the SKILL.md `< 0.40` fallback to "article" on every input.
+    #
+    # The fix is to use raw NLI entailment probabilities directly:
+    # for each candidate label, the model emits an independent entailment
+    # probability in [0, 1]; we argmax over those and the winning value
+    # IS the confidence. This is the canonical "argmax-of-independent-NLI"
+    # pattern (see Yin et al. 2019; HuggingFace `pipeline("zero-shot-
+    # classification")` uses exactly this when `multi_label=True`).
+    #
+    # The "source type IS exclusive" semantic is preserved -- we still
+    # return one (type, confidence) tuple. Exclusivity is enforced by
+    # argmax in the caller below, not by softmax in the score function.
     results = classify(
         text=head,
         labels=label_phrases,
-        multi_label=False,           # source type IS exclusive
+        multi_label=True,
         template=SOURCE_TYPE_TEMPLATE,
     )
 

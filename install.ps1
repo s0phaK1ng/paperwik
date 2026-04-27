@@ -28,6 +28,33 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.6.8 -- classifier scoring mode fix.
+
+    The v0.6.7 template + label tuning made the classifier pick the
+    RIGHT types (academic for academic text, article for web articles)
+    but confidence stayed pinned at ~0.167 (uniform random with 6
+    labels). Tracing the math: source_classifier was calling
+    classify(multi_label=False), which softmaxes across labels. With 6
+    independent NLI entailment probabilities in [0, 1], softmax barely
+    sharpens the distribution -- even when the model gave the right
+    type entailment 0.9 and others 0.3, softmax output capped at
+    ~0.22-ish, well below the SKILL.md confidence threshold of 0.40.
+
+    Fix: switched source_classifier to multi_label=True. This returns
+    raw independent entailment probabilities; we argmax over them.
+    The winning entailment probability IS the confidence -- if the
+    model thinks "this text is an academic paper" with 0.95
+    entailment, that 0.95 surfaces as the user's confidence, not a
+    diluted softmax-across-labels artifact.
+
+    This is the canonical "argmax-of-independent-NLI" pattern (HF
+    pipeline("zero-shot-classification") uses exactly this when
+    multi_label=True). The "source type IS exclusive" semantic is
+    preserved -- we still return one (type, confidence) tuple,
+    enforced by argmax not softmax.
+
+    Pre-commit parse-tested per memory rule. PARSE OK.
+
     v0.6.7 -- classifier accuracy tuning. The v0.6.6 sandbox confirmed
     classify.py runs end-to-end (no errors, INT8 model cached, session
     runs) but showed the classifier's softmax output was essentially
