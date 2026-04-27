@@ -28,6 +28,42 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.6.1 -- ingest skill tightening + low-memory indexer fix.
+    Patches two issues exposed by v0.6.0's first sandbox ingest:
+
+    1) The agent silently shipped without (a) running source-type
+       classification and (b) populating <Project>/.paperwik/label.txt
+       for newly-created projects. Both v0.6.0 behaviors were nominally
+       in paperwik-ingest/SKILL.md but written as soft sub-steps that
+       v0.5.x muscle memory routed around. Fix: restructure SKILL.md so
+       source classification is a top-level numbered step (Step 2,
+       formerly the easy-to-skip "Step 1.5") and label generation is a
+       top-level numbered step (Step 5, formerly the nested "Step 3a").
+       Add a pre-flight checklist at the top of the Flow section and a
+       Step 11 self-check that verifies the four mandatory outputs
+       before reporting back. New "Always run source classification"
+       and "Always populate .paperwik/label.txt" Rules-section bullets
+       mirror the existing "Always run the project router" tone.
+
+    2) The fastembed indexer OOMs at default batch size on 4 GB Windows
+       Sandbox VMs (~1 GB ONNXRuntime MatMul allocation > sandbox
+       headroom). Fix: cap embed_batch's per-call batch size at 4 by
+       default (empirically safe for 4 GB sandbox; agent verified
+       batch_size=2 worked there in the v0.6.0 run). Power users on
+       big-RAM machines can override via PAPERWIK_EMBED_BATCH_SIZE env
+       var.
+
+    New install.ps1 substep (c10): backfill .paperwik/label.txt
+    placeholders for any pre-existing project folders. Defends the
+    v0.5.x -> v0.6.x upgrade path so projects that pre-date v0.6.0 can
+    participate in ZSC routing once the agent organically populates
+    their labels on next ingest. Idempotent.
+
+    No new Anthropic API dependency. No change to route_content() or
+    classify() signatures (per v0.6.0 D3, D4). Pre-commit parse-tested
+    per memory rule (Get-Content -Raw -Encoding UTF8 + ScriptBlock
+    Create). PARSE OK.
+
     v0.6.0 -- zero-shot classification routing. Adds a ZSC-first branch
     to project_router.py that runs DeBERTa-v3-base-zeroshot-v2.0-c (ONNX,
     INT8-quantized lazily on first ingest) against per-project descriptive
@@ -2072,6 +2108,54 @@ if (Test-Path $vaultRoot) {
         Write-Host "      Merged ZSC routing keys into vault retrieval_config.json (zsc_enabled=true)." -ForegroundColor Green
     } catch {
         Write-Host "      Couldn't merge ZSC keys into retrieval_config.json: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+# --- (c10) Backfill .paperwik/label.txt for pre-existing projects (v0.6.1) ---
+# v0.6.0's _create_project() in project_router.py creates each new project's
+# .paperwik/label.txt placeholder at project-creation time. But projects that
+# were created BEFORE v0.6.0 (e.g. by users upgrading from v0.5.x) don't have
+# the .paperwik/ directory at all -- so they silently fall through to cosine
+# routing forever, even though zsc_enabled=true.
+#
+# This step walks Vault/Projects/* and ensures every project has the
+# directory structure ready. Idempotent: skips projects that already have
+# the label.txt file (regardless of whether it's empty or populated).
+#
+# We deliberately do NOT populate the label.txt content -- that's the
+# agent's job during the next ingest into each project (per paperwik-ingest
+# Step 5 in v0.6.1). We just create the empty placeholder so the agent has
+# a stable file to write to without parent-directory races.
+$projectsDir = Join-Path $vaultRoot "Vault\Projects"
+if (Test-Path $projectsDir) {
+    try {
+        $backfilledCount = 0
+        $alreadyOkCount = 0
+        $projectFolders = Get-ChildItem -Path $projectsDir -Directory -ErrorAction SilentlyContinue
+        foreach ($projDir in $projectFolders) {
+            $paperwikMeta = Join-Path $projDir.FullName ".paperwik"
+            $labelFile = Join-Path $paperwikMeta "label.txt"
+            if (Test-Path $labelFile) {
+                $alreadyOkCount++
+                continue
+            }
+            if (-not (Test-Path $paperwikMeta)) {
+                New-Item -ItemType Directory -Path $paperwikMeta -Force | Out-Null
+            }
+            # Create empty file (zero bytes). The agent populates it on next
+            # ingest into this project. ZSC router treats empty labels as
+            # "not participating" -- silent cosine fallback for that project.
+            [System.IO.File]::WriteAllText($labelFile, "", (New-Object System.Text.UTF8Encoding $false))
+            $backfilledCount++
+        }
+        if ($backfilledCount -gt 0) {
+            Write-Host "      Backfilled .paperwik/label.txt placeholders in $backfilledCount pre-existing project(s); $alreadyOkCount already had them." -ForegroundColor Green
+        } elseif ($alreadyOkCount -gt 0) {
+            Write-Host "      All $alreadyOkCount existing project(s) already have .paperwik/label.txt." -ForegroundColor DarkGray
+        }
+        # else: no projects yet (fresh install) — nothing to backfill, no message
+    } catch {
+        Write-Host "      Couldn't backfill project label.txt placeholders: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
 

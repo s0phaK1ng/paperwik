@@ -32,6 +32,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import struct
 import threading
 from typing import Iterable
@@ -42,6 +43,37 @@ _model_lock = threading.Lock()
 MODEL_NAME = "nomic-ai/nomic-embed-text-v1.5"
 EMBED_DIM = 768
 THREADS = 4
+
+# v0.6.1: cap fastembed's per-call batch size to keep ONNXRuntime allocations
+# under the ~1 GB ceiling that 4 GB Windows Sandbox VMs hit. Default of 4 was
+# chosen empirically — the v0.6.0 sandbox confirmed batch_size=2 worked
+# without OOM (model.embed allocated <500 MB); 4 doubles throughput while
+# staying safely under the 1.115 GB allocation that crashed the sandbox at
+# fastembed's default batch.
+#
+# Power users on big-RAM machines (16 GB+) can override via the env var:
+#     PAPERWIK_EMBED_BATCH_SIZE=32 uv run index_source.py ...
+# Higher values trade memory for throughput — typical embed time per chunk
+# is ~10-20 ms after warmup, so the speedup matters mainly for big ingests
+# (1000+ chunks). For dad's friend/family workload (1-50 chunks per source),
+# the default of 4 is plenty fast.
+SAFE_DEFAULT_BATCH_SIZE = 4
+_BATCH_SIZE_ENV_VAR = "PAPERWIK_EMBED_BATCH_SIZE"
+
+
+def _resolve_batch_size(explicit: int | None = None) -> int:
+    """Resolve the effective batch size: explicit arg > env var > safe default."""
+    if explicit is not None:
+        return max(1, int(explicit))
+    raw = os.environ.get(_BATCH_SIZE_ENV_VAR)
+    if raw:
+        try:
+            n = int(raw)
+            if n >= 1:
+                return n
+        except ValueError:
+            pass  # fall through to safe default if env var is malformed
+    return SAFE_DEFAULT_BATCH_SIZE
 
 
 def _get_model():
@@ -85,10 +117,33 @@ def embed_doc(text: str) -> list[float]:
     return vecs[0].tolist()
 
 
-def embed_batch(texts: Iterable[str]) -> list[list[float]]:
-    """Embed many documents at once. Much faster than calling embed_doc per item."""
+def embed_batch(
+    texts: Iterable[str],
+    batch_size: int | None = None,
+) -> list[list[float]]:
+    """Embed many documents at once. Much faster than calling embed_doc per item.
+
+    Args:
+        texts: iterable of document chunks to embed.
+        batch_size: per-fastembed-call batch size. If None (default), resolves
+            from `PAPERWIK_EMBED_BATCH_SIZE` env var if set, else falls back
+            to `SAFE_DEFAULT_BATCH_SIZE` (4 — safe for 4 GB Windows Sandbox).
+
+    Returns:
+        list of embedding vectors (each a list[float] of length EMBED_DIM).
+
+    v0.6.1 background:
+        v0.6.0's first-sandbox ingest (Grokipedia LLM page, 38 chunks) hit an
+        ONNXRuntime allocation failure ("Failed to allocate memory for
+        requested buffer of size 1115419904") because fastembed's default
+        batch size triggers a ~1 GB MatMul scratch buffer that overruns
+        4 GB Windows Sandbox memory headroom. Capping batch_size at 4 in
+        this wrapper prevents that crash without measurably slowing typical
+        small ingests.
+    """
     model = _get_model()
-    return [v.tolist() for v in model.embed(list(texts))]
+    bs = _resolve_batch_size(batch_size)
+    return [v.tolist() for v in model.embed(list(texts), batch_size=bs)]
 
 
 # --------------------------------------------------------------------------- #
