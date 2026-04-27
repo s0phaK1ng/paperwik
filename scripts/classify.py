@@ -270,7 +270,15 @@ def _entailment_probs(text: str, labels: Sequence[str], template: str) -> np.nda
     """
     session, tokenizer = _load_session()
 
-    not_idx = 1 - _ENTAILMENT_IDX
+    # v0.6.6: query the ONNX session for expected input names and only pass
+    # those. Different DeBERTa-v3 ONNX exports include or omit
+    # token_type_ids depending on how transformers.onnx (or optimum) was
+    # configured at export time. The gincioks/* export of the -c variant
+    # (our default repo as of v0.6.0 D2) was generated WITHOUT
+    # token_type_ids; passing it anyway crashes session.run with
+    # "InvalidArgument: Invalid input name: token_type_ids". The dynamic
+    # filter below makes us robust to either export variant.
+    expected_input_names = {inp.name for inp in session.get_inputs()}
 
     # We tokenize each (premise, hypothesis) pair separately for clarity.
     # Batching would be ~2x faster but for paperwik's typical N=2-10 labels
@@ -282,16 +290,16 @@ def _entailment_probs(text: str, labels: Sequence[str], template: str) -> np.nda
 
         ids = np.array([encoded.ids], dtype=np.int64)
         attn = np.array([encoded.attention_mask], dtype=np.int64)
-        type_ids = np.array([encoded.type_ids], dtype=np.int64)
 
-        outputs = session.run(
-            None,
-            {
-                "input_ids": ids,
-                "attention_mask": attn,
-                "token_type_ids": type_ids,
-            },
-        )
+        feed: dict = {}
+        if "input_ids" in expected_input_names:
+            feed["input_ids"] = ids
+        if "attention_mask" in expected_input_names:
+            feed["attention_mask"] = attn
+        if "token_type_ids" in expected_input_names:
+            feed["token_type_ids"] = np.array([encoded.type_ids], dtype=np.int64)
+
+        outputs = session.run(None, feed)
         logits = outputs[0][0]  # shape (2,)
         sm = _softmax(logits)
         probs[i] = float(sm[_ENTAILMENT_IDX])

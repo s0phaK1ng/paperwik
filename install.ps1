@@ -28,6 +28,41 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.6.6 -- last classifier-correctness fix. Followup to v0.6.5.
+
+    The v0.6.5 sandbox test got past quantization (sympy was the
+    blocker) and successfully cached the INT8 model. But session.run
+    on the cached model crashed with:
+
+        InvalidArgument: Invalid input name: token_type_ids
+
+    Cause: the gincioks ONNX export (our chosen runtime repo per
+    D2) was generated WITHOUT token_type_ids as an input; classify.py
+    was unconditionally passing one. Different DeBERTa-v3 ONNX
+    exports include or omit token_type_ids depending on how
+    transformers.onnx / optimum was configured at export time, so
+    hard-coding the input list is brittle.
+
+    Fix: classify._entailment_probs now queries
+    session.get_inputs() and only passes inputs the model declares.
+    Robust across either export variant.
+
+    After v0.6.6 the classifier path is end-to-end functional:
+      1. v0.6.0 -- routing logic (cosine + ZSC fallback)
+      2. v0.6.2 -- embedded classifier in router CLI
+      3. v0.6.3 -- onnx dep so quantize_dynamic imports
+      4. v0.6.4 -- write_summary + populate_label tools and indexer
+                   pre-flight gates (so YAML and label.txt always
+                   land correctly even if classifier fails)
+      5. v0.6.5 -- sympy dep so quantize_dynamic actually runs
+      6. v0.6.6 -- session.run() input-name compatibility
+
+    Five rapid patches uncovered five stacked failure modes that
+    only surface end-to-end on a real install. Each release is small
+    and surgical.
+
+    Pre-commit parse-tested per memory rule. PARSE OK.
+
     v0.6.5 -- one more transitive dep. Followup to v0.6.3 / v0.6.4.
 
     Added `sympy>=1.12.0` to PEP-723 deps in classify.py,
