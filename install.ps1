@@ -28,6 +28,50 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.6.2 -- architectural enforcement (the v0.6.1 SKILL.md prose
+    tightening didn't work; the agent kept skipping classification and
+    label generation on URL-style ingests). Instead of trying harder
+    prose, this version makes the system unskippable at the API level:
+
+    1) project_router.py CLI now embeds source-type classification.
+       The router's JSON output gains source_type and
+       source_type_confidence fields. The agent literally cannot route
+       without classification firing -- closes the v0.6.0 / v0.6.1
+       failure mode where source_classifier.py was silently never
+       invoked.
+
+    2) Cosine threshold AUTO_SPLIT_BELOW bumped 0.55 -> 0.70.
+       Empirical evidence from v0.6.1 sandbox: nomic-embed-text-v1.5
+       gives ~0.55-0.65 cosine for any two coherent English documents,
+       so 0.55 produced false-positive auto-files. The agent had to
+       override the router decision when "Open Source" hit cosine 0.63
+       against the lone "Large Language Model" project. 0.70 makes
+       false positives rare.
+
+    3) Cold-start safety: when only 1 prior project exists, require
+       cosine >= 0.85 to file into it. With 1 project there's no
+       comparative context, so cosine alone isn't reliable signal --
+       force "create new project" unless similarity is very high.
+
+    4) _create_project() writes a TODO marker into .paperwik/label.txt
+       instead of leaving the file empty. Empty labels silently disable
+       ZSC (invisible failure mode); the TODO marker is observable.
+       _read_project_label() treats labels starting with "TODO:" as
+       "not yet populated" and the project doesn't participate in ZSC
+       until the agent fills it in.
+
+    install.ps1 substep (c10) updated to write the same TODO marker
+    when backfilling pre-existing projects.
+
+    SKILL.md updated to reflect the new flow: source classification is
+    now a side-effect of routing (Step 2 = Route, returns source_type),
+    not a separate prerequisite step.
+
+    No new Anthropic API dependency. classify() and route_content()
+    signatures unchanged (per v0.6.0 D3, D4 -- stable contracts).
+
+    Pre-commit parse-tested per memory rule. PARSE OK.
+
     v0.6.1 -- ingest skill tightening + low-memory indexer fix.
     Patches two issues exposed by v0.6.0's first sandbox ingest:
 
@@ -2142,10 +2186,17 @@ if (Test-Path $projectsDir) {
             if (-not (Test-Path $paperwikMeta)) {
                 New-Item -ItemType Directory -Path $paperwikMeta -Force | Out-Null
             }
-            # Create empty file (zero bytes). The agent populates it on next
-            # ingest into this project. ZSC router treats empty labels as
-            # "not participating" -- silent cosine fallback for that project.
-            [System.IO.File]::WriteAllText($labelFile, "", (New-Object System.Text.UTF8Encoding $false))
+            # v0.6.2: write a TODO marker instead of an empty file. The
+            # agent (or a future migration) detects projects whose labels
+            # start with "TODO:" and replaces them with real descriptive
+            # labels on next ingest. Empty placeholders silently disable
+            # ZSC for that project; the marker keeps the unfilled state
+            # OBSERVABLE. The Python router's _read_project_label() treats
+            # any text starting with "TODO:" as "not yet populated" and
+            # routes via cosine for that project until the agent fills it
+            # in.
+            $todoMarker = "TODO: agent should populate this with a one-sentence descriptive label of this project's topical focus."
+            [System.IO.File]::WriteAllText($labelFile, $todoMarker, (New-Object System.Text.UTF8Encoding $false))
             $backfilledCount++
         }
         if ($backfilledCount -gt 0) {

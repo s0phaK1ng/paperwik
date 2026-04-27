@@ -53,7 +53,7 @@ index.md, knowledge.db), they're at the system root.
 
 ---
 
-## Pre-flight checklist (v0.6.1 — read this BEFORE you start)
+## Pre-flight checklist (v0.6.2 — read this BEFORE you start)
 
 By the end of this skill, you MUST have produced **four** outputs. If any is
 missing when you reach the Self-check step, you skipped a step — go back and
@@ -61,15 +61,16 @@ fix it before reporting to the user.
 
 | # | Required output | Set by |
 |---|-----------------|--------|
-| 1 | `source_type` value captured (one of: academic / article / newsletter / social / journal / reference) | **Step 2** |
-| 2 | Summary page YAML frontmatter contains a `source_type:` field with that value | **Step 6** |
-| 3 | For new projects (`is_new=true`): `Vault/Projects/<Project>/.paperwik/label.txt` is non-empty (one descriptive sentence) | **Step 5** |
-| 4 | Indexer ran and returned a chunks count | **Step 8** |
+| 1 | `source_type` value captured (one of: academic / article / newsletter / social / journal / reference) | **Step 2** — returned in router JSON |
+| 2 | Summary page YAML frontmatter contains a `source_type:` field with that value | **Step 5** |
+| 3 | For new projects (`is_new=true`): `Vault/Projects/<Project>/.paperwik/label.txt` is a real one-sentence description (does NOT start with `TODO:`) | **Step 4** |
+| 4 | Indexer ran and returned a chunks count | **Step 7** |
 
-A v0.6.0 sandbox ingest silently shipped without #1, #2, and #3 — the agent
-followed v0.5.x muscle memory through a flow that didn't yet exist. v0.6.1
-restructures the steps below so this is no longer easy to do. Treat the
-numbered steps as a hard contract.
+v0.6.0 / v0.6.1 sandboxes shipped without #1, #2, #3 because the agent
+followed v0.5.x muscle memory and skipped the classification + label steps
+that prose-tightening was supposed to enforce. v0.6.2 fixes this
+**architecturally**: source classification now happens *inside* the router,
+so Step 2 cannot be skipped without skipping routing entirely.
 
 ---
 
@@ -81,36 +82,64 @@ Glob `Vault/Inbox/` for files newer than the wiki's last ingest log entry (check
 `log.md` tail). If multiple candidates, ask the user which one. If exactly one
 recent file, proceed.
 
-### Step 2. Classify the source TYPE — MANDATORY
+If the user gave you a URL or file path outside `Vault/Inbox/`, copy the
+content into `Vault/Inbox/<slug>.md` first so the rest of the flow has a
+canonical input path — then proceed.
 
-> **MANDATORY — do not proceed past this step until you have captured `source_type` and `confidence`.** The next step (subagent dispatch) consumes the `source_type` to tailor its extraction prompt; the eventual summary page's YAML carries the value forward; missing this step means downstream output is wrong, not just slightly off.
+### Step 2. Route — MANDATORY (this also classifies the source TYPE)
 
-Run zero-shot classification on the source. Fast (~100-300 ms after first-run
-model warmup):
+> **MANDATORY — run this BEFORE writing any project pages, entity pages, or summary content.** The router's JSON output carries both the project assignment AND the source_type. Skipping or running it late means you've already committed to a project name and source_type that the system never validated.
+
+Determine the target project folder + the source's structural type via the
+project router:
 
 ```bash
 PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
-uv run "$PAPERWIK_PLUGIN/scripts/source_classifier.py" \
-    --file "$INBOX_FILE" \
-    --filename "$(basename "$INBOX_FILE")"
+uv run "$PAPERWIK_PLUGIN/scripts/project_router.py" "$INBOX_FILE"
 ```
 
-Output is JSON: `{"type": "...", "confidence": 0.xx}`. Capture both. The
-type is one of: `academic`, `article`, `newsletter`, `social`, `journal`,
-`reference`.
+The router returns JSON with these fields:
 
-**Edge cases:**
+```json
+{
+  "project_name": "...",
+  "project_id": 1,
+  "is_new": true,
+  "max_similarity": 0.42,
+  "routed_via": "cosine_cold_start",
+  "source_type": "article",
+  "source_type_confidence": 0.87
+}
+```
 
-- If `confidence < 0.40`, treat type as `article` (the safe default) but
-  mention the low confidence in your final report so the user knows it's
-  borderline.
-- If the classifier crashes or returns malformed JSON, retry once. If it
-  fails again, treat type as `article` and continue — DO NOT block ingest
-  on classifier failure. Note the failure in your final report.
+**Capture all of these** — they drive the rest of the flow:
 
-**First ingest only:** the classifier downloads (~738 MB FP32) and quantizes
-(~150 MB INT8 final) the ONNX model. Takes ~30-60 seconds and is silent. After
-that, every subsequent ingest reuses the cached INT8 model in
+- `project_name` → where you'll write the summary page (Step 5) and entity
+  pages (Step 6).
+- `is_new` → whether you need to populate `.paperwik/label.txt` (Step 4).
+- `routed_via` → `"zsc"` (label-based match), `"cosine"` (embedding match),
+  `"cosine_cold_start"` (only 1 prior project; created a new one for safety),
+  or `"first"` (very first project ever). Useful for your final report.
+- `source_type` → goes into the summary page's YAML frontmatter (Step 5)
+  AND into the subagent's extraction prompt (Step 3). One of: `academic`,
+  `article`, `newsletter`, `social`, `journal`, `reference`.
+- `source_type_confidence` → if < 0.40, mention low confidence in your
+  final report.
+
+**Respect the routing decision.** Do not override the router's project
+assignment based on your own topical read. v0.6.2's cold-start rule
+(force-new-project when there's only 1 existing project unless cosine ≥ 0.85)
+already addresses the false-positive case that v0.6.1 had to override around.
+If the assignment still seems wrong after that, file a bug — don't override
+inline.
+
+If `is_new=true`, announce the new folder: *"I've created a new project
+folder called 'X' because this source doesn't fit any existing topic
+closely."*
+
+**First ingest only:** the embedded classifier downloads (~738 MB FP32) and
+quantizes (~150 MB INT8 final) the ONNX model. Takes ~30-60 seconds and is
+silent. After that, every subsequent ingest reuses the cached INT8 model in
 `~/.cache/huggingface/hub/.paperwik-int8/`.
 
 ### Step 3. Delegate to a subagent
@@ -141,36 +170,13 @@ Then ask the subagent to:
   papers, organizations).
 - Return those as structured data to the parent.
 
-### Step 4. Route the source to the correct project folder
+### Step 4. Generate descriptive label for new projects — MANDATORY when `is_new=true`
 
-Determine the target project folder via the project router. The plugin's
-Python scripts live inside Claude Code's plugin cache — on Windows that's
-`$HOME/.claude/plugins/marketplaces/paperwik/scripts/` (equivalently
-`$USERPROFILE\.claude\plugins\marketplaces\paperwik\scripts\`).
-`$CLAUDE_PLUGIN_ROOT` is set for some Claude Code hook contexts but
-is NOT reliably exported to the skill's bash shell — use the explicit
-path or the fallback pattern below:
+> **MANDATORY when `is_new=true` — do not proceed past this step until `<Project>/.paperwik/label.txt` contains a real one-sentence description and does NOT start with `TODO:`.** A TODO-marked or empty label silently disables ZSC routing for that project forever, defeating half the v0.6.0 routing improvement.
 
-```bash
-PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
-uv run "$PAPERWIK_PLUGIN/scripts/project_router.py" "$INBOX_FILE"
-```
-
-The router returns JSON with `project_name`, `project_id`, `is_new`,
-`max_similarity`, and (v0.6.0+) `routed_via`. The `routed_via` field is
-`"zsc"`, `"cosine"`, or `"first"` — useful for the diagnostics log but
-not for user messaging. Respect the routing decision silently — do not ask
-the user where to file. If `is_new=true`, announce the new folder: *"I've
-created a new project folder called 'X' because this source doesn't fit
-any existing topic closely."*
-
-### Step 5. Generate descriptive label for new projects — MANDATORY (when `is_new=true`)
-
-> **MANDATORY when `is_new=true` — do not proceed past this step until `<Project>/.paperwik/label.txt` is non-empty.** Empty labels disable ZSC routing for that project FOREVER (the project will silently always fall through to cosine), defeating half the v0.6.0 routing improvement.
-
-When the router reports `is_new=true`, it has already created
-`Vault/Projects/<Project>/.paperwik/label.txt` as an empty placeholder.
-Your job: generate a ONE-SENTENCE descriptive label and write it there.
+When the router reports `is_new=true`, `_create_project()` already wrote a
+TODO marker into `Vault/Projects/<Project>/.paperwik/label.txt`. Your job:
+**replace** the TODO marker with a real one-sentence descriptive label.
 
 The label is what the ZSC router compares future sources against, so the
 more topical and specific the better:
@@ -181,20 +187,20 @@ more topical and specific the better:
 - ✅ Good: `Practical guides for home-improvement DIY projects on older houses.`
 
 Constraints: plain UTF-8 text, one sentence, **no trailing newline**, target
-60–180 characters.
+60–180 characters, must NOT start with `TODO:`.
 
 ```bash
 LABEL_FILE="$USERPROFILE/Paperwik/Vault/Projects/<Project>/.paperwik/label.txt"
 printf '%s' 'Research on dietary interventions for cognitive decline in adults over 60.' > "$LABEL_FILE"
 ```
 
-When `is_new=false` (filing into an existing project), skip this step — the
-existing label, if any, was set on the project's first ingest. Existing
-projects whose `label.txt` is empty (e.g. v0.5.x projects that pre-date
-v0.6.0) are silently skipped by the ZSC router and fall through to cosine;
-that's acceptable degradation.
+When `is_new=false` (filing into an existing project), check whether the
+existing label still starts with `TODO:` — if so, this is a project whose
+label was never populated; **populate it now** based on the source you're
+ingesting + a quick read of the existing summary pages. Otherwise leave
+the existing label alone.
 
-### Step 6. Write the summary page
+### Step 5. Write the summary page
 
 Create a new markdown file at
 `%USERPROFILE%\Paperwik\Vault\Projects\<project_name>\<slug-of-title>.md`.
@@ -202,9 +208,10 @@ Use the frontmatter and structure from Step 3. Use standard markdown links —
 `[Other Page](../Project/Other-Page.md)` — not wikilinks.
 
 **Verify** the YAML frontmatter contains a `source_type:` field whose value
-equals the type from Step 2. This is pre-flight check #2.
+equals the `source_type` from the router output in Step 2. This is pre-flight
+check #2.
 
-### Step 7. Create or update entity pages
+### Step 6. Create or update entity pages
 
 For each entity the subagent identified:
 
@@ -216,11 +223,10 @@ For each entity the subagent identified:
   who/what/why, tagged appropriately (`#person`, `#concept`, `#paper`,
   `#organization`).
 
-### Step 8. Hand off to the indexer
+### Step 7. Hand off to the indexer
 
 Run the indexer script to chunk the source, embed via fastembed, extract
-entities into the graph, and persist to `knowledge.db`. Use the same
-`$PAPERWIK_PLUGIN` resolution pattern as Step 4:
+entities into the graph, and persist to `knowledge.db`:
 
 ```bash
 PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
@@ -230,12 +236,12 @@ uv run "$PAPERWIK_PLUGIN/scripts/index_source.py" --source "<path>" --project "<
 Capture the `chunks` count from the indexer's JSON output. This is pre-flight
 check #4.
 
-**Low-memory note (v0.6.1):** the indexer caps fastembed's batch size at
+**Low-memory note (v0.6.1+):** the indexer caps fastembed's batch size at
 4 by default to avoid the ONNX MatMul OOM that hits 4 GB Windows Sandboxes.
 On big-RAM machines you can override via `PAPERWIK_EMBED_BATCH_SIZE=32`
 (or higher) for faster ingest. Don't worry about this in routine use.
 
-### Step 9. Update `index.md` and `log.md`
+### Step 8. Update `index.md` and `log.md`
 
 - `index.md`: rely on Dataview — no manual edits needed; the Dataview query
   picks up the new page automatically. But verify by reading `index.md`
@@ -243,13 +249,13 @@ On big-RAM machines you can override via `PAPERWIK_EMBED_BATCH_SIZE=32`
 - `log.md`: append a new entry:
   `## [YYYY-MM-DD HH:MM] ingest | <project_name> | <source title>`
 
-### Step 10. Move the source out of `Vault/Inbox/`
+### Step 9. Move the source out of `Vault/Inbox/`
 
 Move the ingested file to `Vault/Projects/<project_name>/_sources/<filename>`
 so the Inbox only ever contains pending items. Never delete the original — the
 user can always re-read it if the summary misses something.
 
-### Step 11. Self-check — verify the four pre-flight outputs
+### Step 10. Self-check — verify the four pre-flight outputs
 
 > Before reporting to the user, run these four checks. If any FAILS, do NOT report success — go back to the offending step, fix it, and re-run the check.
 
@@ -257,32 +263,38 @@ user can always re-read it if the summary misses something.
 SUMMARY_PAGE="$USERPROFILE/Paperwik/Vault/Projects/<Project>/<slug>.md"
 LABEL_FILE="$USERPROFILE/Paperwik/Vault/Projects/<Project>/.paperwik/label.txt"
 
-# Check 1: source_type was captured (you have it as a shell variable from Step 2)
+# Check 1: source_type captured from router output (Step 2)
 [ -n "$SOURCE_TYPE" ] && echo "✓ source_type=$SOURCE_TYPE" || echo "✗ MISSING source_type — go back to Step 2"
 
 # Check 2: summary page YAML has source_type
-grep -q "^source_type:" "$SUMMARY_PAGE" && echo "✓ YAML has source_type" || echo "✗ MISSING source_type in YAML — go back to Step 6"
+grep -q "^source_type:" "$SUMMARY_PAGE" && echo "✓ YAML has source_type" || echo "✗ MISSING source_type in YAML — go back to Step 5"
 
-# Check 3 (new projects only): label.txt is non-empty
+# Check 3 (new projects only): label.txt populated AND not still a TODO marker
 if [ "$IS_NEW" = "true" ]; then
-    [ -s "$LABEL_FILE" ] && echo "✓ label.txt populated ($(wc -c < "$LABEL_FILE") bytes)" || echo "✗ EMPTY label.txt — go back to Step 5"
+    if [ ! -s "$LABEL_FILE" ]; then
+        echo "✗ EMPTY label.txt — go back to Step 4"
+    elif head -c 5 "$LABEL_FILE" | grep -q "^TODO:"; then
+        echo "✗ label.txt still has TODO marker — go back to Step 4 and write a real label"
+    else
+        echo "✓ label.txt populated ($(wc -c < "$LABEL_FILE") bytes)"
+    fi
 fi
 
-# Check 4: indexer reported a chunks count (you captured this from Step 8's output)
-[ -n "$CHUNKS_COUNT" ] && [ "$CHUNKS_COUNT" -gt 0 ] && echo "✓ indexer ran ($CHUNKS_COUNT chunks)" || echo "✗ MISSING chunks count — go back to Step 8"
+# Check 4: indexer reported a chunks count (you captured this from Step 7's output)
+[ -n "$CHUNKS_COUNT" ] && [ "$CHUNKS_COUNT" -gt 0 ] && echo "✓ indexer ran ($CHUNKS_COUNT chunks)" || echo "✗ MISSING chunks count — go back to Step 7"
 ```
 
-If all four pass, proceed to Step 12. If any fails, the offending step was
+If all four pass, proceed to Step 11. If any fails, the offending step was
 skipped or partially executed; fix it before reporting.
 
-### Step 12. Report back to the user
+### Step 11. Report back to the user
 
 Brief, concrete report:
-- Where it was filed
+- Where it was filed (project name + `routed_via`)
 - Source type and confidence (from Step 2)
-- For new projects: the descriptive label you wrote (from Step 5)
+- For new projects: the descriptive label you wrote (from Step 4)
 - How many entity pages were created vs. updated
-- How many chunks landed in the index (from the indexer's output, Step 8)
+- How many chunks landed in the index (from Step 7)
 - Any notable cross-references ("this mentions researcher X who appears in 3
   other reports")
 
@@ -296,20 +308,26 @@ in Obsidian's sidebar as you work — mention that if it's the first ingest.
 - **One ingest at a time.** If multiple files await, process them sequentially
   and report at the end. Do not parallelize — it breaks the log and the
   project router's online learning.
-- **Never ingest content the user hasn't placed in `Vault/Inbox/`.** If they paste
-  a URL, offer to fetch + save it into `Vault/Inbox/` first.
-- **Always run source classification before subagent dispatch.** (v0.6.1) The
-  subagent's extraction prompt depends on it; the YAML frontmatter carries
-  it; downstream queries filter on it. Skipping Step 2 silently breaks
-  three downstream consumers.
-- **Always populate `.paperwik/label.txt` when creating a new project.** (v0.6.1)
-  An empty label silently disables ZSC routing for that project forever.
-  Skipping Step 5 turns a default-on feature off without warning.
-- **Always run the project router.** Never pick a folder heuristically. The
-  router is the learning system.
+- **Always run the project router FIRST** (Step 2), before writing any
+  project pages, entity pages, or summary content. The router's output is
+  the source of truth for both project assignment AND source_type. Don't
+  pick a project name from the source's title — wait for the router.
+- **Respect the router's project assignment.** Do not override based on
+  your own topical read. v0.6.2's cold-start rule already handles the
+  "only one prior project" false-positive case. If the assignment still
+  seems wrong, file a bug — don't override inline.
+- **Always populate `.paperwik/label.txt` when creating a new project,
+  replacing the TODO marker with a real label.** (v0.6.2) The TODO marker
+  is observable but it disables ZSC for the project until replaced;
+  shipping a project still in TODO state defeats the routing improvement.
+- **Source_type comes from the router** (v0.6.2), not from the subagent.
+  Pass it into the subagent's prompt; verify it lands in the summary YAML.
+- **Never ingest content the user hasn't placed in `Vault/Inbox/`.** If they
+  give you a URL, fetch the page and save it into `Vault/Inbox/` first
+  (Step 1).
 - **Never delete the raw source after ingest.** Keep it in `<project>/_sources/`.
 - **If any step fails, stop and report cleanly.** Do not partially ingest —
   broken ingests leave the graph inconsistent.
-- **If Self-check (Step 11) fails, do not report success to the user.** Go
+- **If Self-check (Step 10) fails, do not report success to the user.** Go
   back to the offending step. The four pre-flight outputs are a hard
   contract; missing any one is a failed ingest, not a quirky one.

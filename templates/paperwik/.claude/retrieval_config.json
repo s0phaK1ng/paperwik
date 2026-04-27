@@ -24,8 +24,9 @@
   "entity_types": ["PERSON", "CONCEPT", "PAPER", "ORGANIZATION"],
 
   "project_router": {
-    "auto_split_below_cosine": 0.55,
-    "file_into_closest_above_cosine": 0.55,
+    "auto_split_below_cosine": 0.70,
+    "file_into_closest_above_cosine": 0.70,
+    "cold_start_threshold": 0.85,
     "start_with_single_project": true,
     "learn_from_user_overrides": true,
     "archive_after_days_inactive": 180,

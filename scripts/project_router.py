@@ -77,10 +77,35 @@ except ImportError:
 #  Thresholds (matches retrieval_config.json → project_router)
 # --------------------------------------------------------------------------- #
 
-# v0.5.x cosine-band defaults. Used as fallback when retrieval_config.json
-# is missing or unparseable.
-AUTO_SPLIT_BELOW = 0.55
-FILE_INTO_CLOSEST_ABOVE = 0.55   # one threshold — no ambiguous middle band
+# v0.6.2: cosine threshold bumped from 0.55 -> 0.70. Empirical evidence from
+# v0.6.1 sandbox: with nomic-embed-text-v1.5, two coherent English documents
+# on adjacent technical topics share ~0.55-0.65 cosine regardless of
+# topical fit. The Grokipedia "Open Source" ingest hit cosine 0.63 against
+# the lone "Large Language Model" project -- a topic mismatch the agent had
+# to override. 0.70 is empirically restrictive enough to make false-positive
+# auto-files rare while still firing on genuine topical matches.
+AUTO_SPLIT_BELOW = 0.70
+FILE_INTO_CLOSEST_ABOVE = 0.70   # one threshold — no ambiguous middle band
+
+# v0.6.2 cold-start safety. With only 1 prior project, cosine alone is
+# unreliable signal -- there's no comparative context. Require very high
+# cosine (>= COLD_START_THRESHOLD) to file into the lone project; otherwise
+# create a new one. Once we have >=2 projects, normal AUTO_SPLIT_BELOW
+# applies because comparison between projects gives meaningful signal.
+COLD_START_THRESHOLD = 0.85
+
+# v0.6.2 TODO marker. _create_project() writes this to .paperwik/label.txt
+# instead of leaving the file empty. Empty labels silently disable ZSC for
+# that project; a TODO marker makes the unfilled state OBSERVABLE and
+# detectable -- the agent (or a future migration) can recognize the marker
+# and replace it with a real descriptive label. _read_project_label()
+# treats labels starting with this prefix as "not yet populated" and the
+# project doesn't participate in ZSC routing until the label is real.
+TODO_LABEL_PREFIX = "TODO:"
+TODO_LABEL_TEXT = (
+    "TODO: agent should populate this with a one-sentence descriptive "
+    "label of this project's topical focus."
+)
 
 # v0.6.0 ZSC routing defaults. Loaded from retrieval_config.json's nested
 # project_router block at runtime via _load_zsc_config(); these constants
@@ -170,10 +195,18 @@ def _project_label_path(project_name: str) -> Path:
 
 
 def _read_project_label(project_name: str) -> str | None:
-    """Return the descriptive label for a project, or None if missing/empty.
+    """Return the descriptive label for a project, or None if not populated.
 
-    A non-empty label is REQUIRED for the project to participate in ZSC
-    routing. Projects without label.txt fall through to cosine.
+    A non-empty, non-TODO label is REQUIRED for the project to participate
+    in ZSC routing. Projects without label.txt, with empty label.txt, or
+    with the v0.6.2 TODO marker text fall through to cosine.
+
+    The TODO marker (set by _create_project on new projects in v0.6.2+)
+    is treated as "agent has not yet replaced the placeholder." This is
+    distinct from genuinely-empty (legacy v0.6.0 / v0.6.1 placeholders) --
+    both produce the same routing behavior (skip ZSC) but the TODO marker
+    is observable, so a future migration / lint pass can detect projects
+    still waiting for their label.
     """
     p = _project_label_path(project_name)
     if not p.exists():
@@ -182,7 +215,11 @@ def _read_project_label(project_name: str) -> str | None:
         text = p.read_text(encoding="utf-8").strip()
     except OSError:
         return None
-    return text or None
+    if not text:
+        return None
+    if text.startswith(TODO_LABEL_PREFIX):
+        return None  # placeholder; agent hasn't populated it yet
+    return text
 
 
 def _zsc_classify(
@@ -529,6 +566,27 @@ def route_content(
     scored.sort(key=lambda x: x[0], reverse=True)
     top_sim, top_proj = scored[0]
 
+    # v0.6.2 cold-start safety. With only 1 prior project, cosine signal
+    # is unreliable -- two coherent English documents share ~0.55-0.65
+    # cosine in nomic-embed-text-v1.5 regardless of topical fit, so
+    # filing into the lone existing project at AUTO_SPLIT_BELOW=0.70
+    # would still produce false positives (this is exactly what bit
+    # the v0.6.1 sandbox: "Open Source" hit 0.63 against the lone
+    # "Large Language Model" project). Require COLD_START_THRESHOLD=0.85
+    # to file into the lone project; otherwise create a new one.
+    # Once we have >=2 projects, AUTO_SPLIT_BELOW alone is restrictive
+    # enough because there's comparative signal between candidates.
+    if len(scored) == 1 and top_sim < COLD_START_THRESHOLD:
+        name = generate_project_name(content, api_key=api_key)
+        pid = _create_project(conn, name, content_embedding)
+        return {
+            "project_name": name,
+            "project_id": pid,
+            "is_new": True,
+            "max_similarity": top_sim,
+            "routed_via": "cosine_cold_start",
+        }
+
     if top_sim < AUTO_SPLIT_BELOW:
         # Create a new project
         name = generate_project_name(content, api_key=api_key)
@@ -586,21 +644,25 @@ def _create_project(conn: sqlite3.Connection, name: str, centroid: list[float]) 
     folder = user_profile / "Paperwik" / "Vault" / "Projects" / name
     folder.mkdir(parents=True, exist_ok=True)
 
-    # v0.6.0: create the per-project ZSC metadata folder + empty label.txt
-    # placeholder. The paperwik agent fills this in on first ingest with a
-    # one-sentence descriptive expansion (which the ZSC router reads on
-    # subsequent ingests). We CREATE the file here even if empty so the
-    # agent has a stable file path to write to without worrying about
-    # parent-folder creation later.
+    # v0.6.0+: create the per-project ZSC metadata folder + label.txt
+    # placeholder. The paperwik agent fills this in on first ingest with
+    # a one-sentence descriptive expansion (which the ZSC router reads on
+    # subsequent ingests). We CREATE the file here so the agent has a
+    # stable file path to write to without worrying about parent-folder
+    # creation later.
+    #
+    # v0.6.2: write a TODO marker instead of leaving the file empty. An
+    # empty file silently disables ZSC for this project (the same routing
+    # behavior as a missing label), which makes the unfilled state
+    # invisible. The TODO marker is OBSERVABLE -- a future migration or
+    # the agent on next ingest can detect the marker and replace it with
+    # a real label. _read_project_label() treats labels starting with
+    # TODO_LABEL_PREFIX as "not populated" and returns None (skip ZSC).
     paperwik_meta = folder / ".paperwik"
     paperwik_meta.mkdir(parents=True, exist_ok=True)
     label_file = paperwik_meta / "label.txt"
     if not label_file.exists():
-        # Empty file — agent's responsibility to populate at first-ingest
-        # time. ZSC routing skips projects whose label.txt is empty (see
-        # _read_project_label), so an unfilled placeholder simply means
-        # this project doesn't participate in ZSC until the agent labels it.
-        label_file.write_text("", encoding="utf-8")
+        label_file.write_text(TODO_LABEL_TEXT, encoding="utf-8")
 
     return int(cur.lastrowid)
 
@@ -688,10 +750,49 @@ def _cmd_route(content_path: str) -> int:
     if not db_path.exists():
         print(f"knowledge.db not found at {db_path}", file=sys.stderr)
         return 1
-    content = Path(content_path).read_text(encoding="utf-8")[:ROUTING_SNIPPET_CHARS]
+    content_path_obj = Path(content_path)
+    content = content_path_obj.read_text(encoding="utf-8")[:ROUTING_SNIPPET_CHARS]
+
+    # v0.6.2: embed source-type classification into the router CLI.
+    # Architectural enforcement: every router invocation produces a
+    # source_type field, regardless of whether the agent's SKILL.md
+    # flow remembers to invoke source_classifier.py separately. This
+    # closes the v0.6.0 / v0.6.1 failure mode where the agent silently
+    # skipped source classification and shipped summary YAML without a
+    # source_type: field. Now the router IS the classification call --
+    # the agent literally cannot route without classification firing.
+    #
+    # Failure-mode handling: if classification crashes (corrupted ONNX,
+    # network error mid first-run download, etc.), we log to stderr and
+    # default source_type to "article" (the safe / most-common type).
+    # Routing must never block on classifier failure.
+    source_type: str = "article"
+    source_type_confidence: float = 0.0
+    try:
+        # Lazy import: source_classifier pulls in classify which pulls
+        # in onnxruntime + tokenizers. Heavy on first-import; cached on
+        # repeat calls.
+        from source_classifier import classify_source_type  # type: ignore
+
+        metadata = {"filename": content_path_obj.name}
+        s_type, s_conf = classify_source_type(content, metadata=metadata)
+        source_type = s_type or "article"
+        source_type_confidence = float(s_conf or 0.0)
+    except Exception as exc:
+        # Defensive: never let classifier failure block routing.
+        print(
+            f"[project_router] source classifier failed ({exc!r}); "
+            f"defaulting source_type=article",
+            file=sys.stderr,
+        )
+
     conn = sqlite3.connect(str(db_path))
     try:
         result = route_content(conn, content)
+        # v0.6.2: augment routing result with source_type so callers
+        # have it without a separate classifier invocation.
+        result["source_type"] = source_type
+        result["source_type_confidence"] = source_type_confidence
         print(json.dumps(result, indent=2))
     finally:
         conn.close()
