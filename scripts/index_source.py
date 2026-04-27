@@ -399,6 +399,123 @@ def _upsert_source(
 
 
 # --------------------------------------------------------------------------- #
+#  v0.6.4 hard-gate validation: refuse to index if the agent skipped
+#  Step 4 (label generation) or Step 5 (write_summary with source_type).
+# --------------------------------------------------------------------------- #
+
+class IngestPreflightError(RuntimeError):
+    """Raised when v0.6.4 pre-flight checks fail. The agent has work
+    to do (write a real label, regenerate the summary with source_type)
+    before re-running the indexer."""
+
+
+def _label_path_for(project: str) -> Path:
+    user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
+    return (
+        user_profile / "Paperwik" / "Vault" / "Projects"
+        / project / ".paperwik" / "label.txt"
+    )
+
+
+def _project_dir_for(project: str) -> Path:
+    user_profile = Path(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
+    return user_profile / "Paperwik" / "Vault" / "Projects" / project
+
+
+def _check_label_populated(project: str) -> None:
+    """v0.6.4: refuse to index if the project's label.txt is empty or
+    still has the TODO marker. Forces the agent to populate it (via
+    populate_label.py) before indexing.
+
+    Skipped when label.txt is genuinely missing entirely -- that means
+    this is an old v0.5.x project and we shouldn't penalize the user
+    for the legacy state.
+    """
+    p = _label_path_for(project)
+    if not p.exists():
+        # Legacy project (pre-v0.6.0). Don't block; the install.ps1 c10
+        # backfill will create a TODO marker on next install.
+        return
+    text = p.read_text(encoding="utf-8").strip()
+    if not text:
+        raise IngestPreflightError(
+            f"Project '{project}' has an EMPTY .paperwik/label.txt. "
+            f"Populate it with a real one-sentence descriptive label "
+            f"before indexing. Use:\n"
+            f"  uv run \"$PAPERWIK_PLUGIN/scripts/populate_label.py\" "
+            f"--project \"{project}\" --label \"<one descriptive sentence>\""
+        )
+    if text.startswith("TODO:"):
+        raise IngestPreflightError(
+            f"Project '{project}' .paperwik/label.txt still has the TODO "
+            f"marker. Replace it with a real one-sentence descriptive "
+            f"label before indexing. Use:\n"
+            f"  uv run \"$PAPERWIK_PLUGIN/scripts/populate_label.py\" "
+            f"--project \"{project}\" --label \"<one descriptive sentence>\""
+        )
+
+
+def _check_summary_has_source_type(project: str, source_path: Path) -> None:
+    """v0.6.4: refuse to index if no summary page in the project folder
+    has a `source_type:` field in YAML frontmatter referencing this
+    source. Forces the agent to use write_summary.py (which always
+    emits source_type) instead of hand-writing summary YAML.
+
+    Heuristic: scan all top-level *.md files in the project directory.
+    If at least one has a YAML `source_type:` field, the gate passes.
+    We don't require the matching summary to reference THIS specific
+    source -- the indexer doesn't know the agent's mapping between
+    source path and summary slug. The looser check is "has the agent
+    written *some* summary with source_type for this project?" which
+    is the right gate for typical 1-source-per-ingest flows.
+    """
+    project_dir = _project_dir_for(project)
+    if not project_dir.exists():
+        # Project folder doesn't exist yet -- this shouldn't happen since
+        # _ensure_project_row ran before this. Defensive only.
+        return
+
+    md_files = [
+        p for p in project_dir.glob("*.md")
+        if p.is_file()
+    ]
+    if not md_files:
+        raise IngestPreflightError(
+            f"Project '{project}' has no summary markdown files yet. "
+            f"Write the summary page first (use write_summary.py with a "
+            f"JSON spec containing source_type), then re-run the indexer."
+        )
+
+    for md in md_files:
+        try:
+            text = md.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        # Accept either inside a frontmatter block (---...---) or at
+        # the top of the file. Loose regex; strict YAML parsing is overkill
+        # for a one-line check.
+        if re.search(r"(?m)^source_type:\s*\S+", text[:2000]):
+            return  # at least one summary has source_type -- pass
+
+    raise IngestPreflightError(
+        f"Project '{project}' has summary file(s) but none contain a "
+        f"`source_type:` YAML field. Regenerate the summary using "
+        f"write_summary.py (which always emits source_type), or add the "
+        f"field to the existing YAML frontmatter:\n"
+        f"  uv run \"$PAPERWIK_PLUGIN/scripts/write_summary.py\" "
+        f"--json /path/to/spec.json"
+    )
+
+
+def _run_preflight_checks(project: str, source_path: Path) -> None:
+    """v0.6.4: run all pre-flight checks. Raises IngestPreflightError on
+    any failure. Caller should let the exception propagate (it has a
+    rich error message instructing the agent how to fix)."""
+    _check_label_populated(project)
+    _check_summary_has_source_type(project, source_path)
+
+
+# --------------------------------------------------------------------------- #
 #  Main indexing pipeline
 # --------------------------------------------------------------------------- #
 
@@ -406,14 +523,26 @@ def index_source(
     source_path: Path,
     project: str,
     title: str | None = None,
+    skip_preflight: bool = False,
 ) -> dict:
     """Chunk, embed, and index a single source. Returns a stats dict.
 
     Raises on hard failures (file missing, DB unreachable, embedding failure).
     Entity extraction failures are logged but do not raise.
+
+    v0.6.4: pre-flight checks now refuse to run if the project's label.txt
+    is unpopulated (empty / TODO marker) or if no summary page in the
+    project has a `source_type:` YAML field. Skip with skip_preflight=True
+    only for migration / fix-up scenarios where you know the project's
+    state is intentionally incomplete.
     """
     if not source_path.exists():
         raise FileNotFoundError(f"Source not found: {source_path}")
+
+    if not skip_preflight:
+        # v0.6.4: hard gate. Will raise IngestPreflightError with a clear
+        # message if the agent skipped Step 4 or Step 5.
+        _run_preflight_checks(project, source_path)
 
     log(f"Indexing source: {source_path} into project '{project}'")
 
@@ -530,17 +659,41 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--source", required=True, help="Path to the source file on disk.")
     parser.add_argument("--project", required=True, help="Target project (folder name in vault).")
     parser.add_argument("--title", default=None, help="Optional human-readable title; defaults to filename stem.")
+    parser.add_argument(
+        "--skip-preflight",
+        action="store_true",
+        help=(
+            "v0.6.4: skip the source_type-in-YAML and label.txt-populated "
+            "pre-flight checks. Use ONLY for migration / fix-up scenarios "
+            "where the project's state is intentionally incomplete. Normal "
+            "ingest flows MUST NOT use this flag -- the pre-flight is the "
+            "architectural enforcement that fixed the v0.6.0/v0.6.1/v0.6.2 "
+            "agent-skip failure mode."
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str]) -> int:
     args = _parse_args(argv)
     try:
-        stats = index_source(Path(args.source), args.project, title=args.title)
+        stats = index_source(
+            Path(args.source),
+            args.project,
+            title=args.title,
+            skip_preflight=args.skip_preflight,
+        )
     except FileNotFoundError as exc:
         log(f"FATAL: {exc}", level="ERROR")
         print(json.dumps({"error": str(exc), "kind": "not_found"}), file=sys.stdout)
         return 2
+    except IngestPreflightError as exc:
+        # v0.6.4: pre-flight failures are an EXPECTED outcome, not a crash.
+        # Emit the clear, actionable error message to stderr (so the agent
+        # sees it inline) and return a distinguishable exit code.
+        log(f"PREFLIGHT FAILED: {exc}", level="ERROR")
+        print(json.dumps({"error": str(exc), "kind": "preflight_failed"}, indent=2), file=sys.stdout)
+        return 3
     except Exception as exc:
         log(f"FATAL: {exc}", level="ERROR")
         print(json.dumps({"error": str(exc), "kind": "index_failed"}), file=sys.stdout)

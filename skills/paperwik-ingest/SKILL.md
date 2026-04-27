@@ -170,46 +170,77 @@ Then ask the subagent to:
   papers, organizations).
 - Return those as structured data to the parent.
 
-### Step 4. Generate descriptive label for new projects — MANDATORY when `is_new=true`
+### Step 4. Populate descriptive label for new projects — use `populate_label.py`
 
-> **MANDATORY when `is_new=true` — do not proceed past this step until `<Project>/.paperwik/label.txt` contains a real one-sentence description and does NOT start with `TODO:`.** A TODO-marked or empty label silently disables ZSC routing for that project forever, defeating half the v0.6.0 routing improvement.
+> **(v0.6.4)** Hand-writing `.paperwik/label.txt` was unreliable across v0.6.0–v0.6.3 sandbox testing — the agent kept leaving the TODO marker in place. v0.6.4 routes label generation through a dedicated tool that validates the label and refuses TODO/empty/too-short input. The indexer (Step 7) will now REFUSE to run if any project's label is still in TODO state.
 
-When the router reports `is_new=true`, `_create_project()` already wrote a
-TODO marker into `Vault/Projects/<Project>/.paperwik/label.txt`. Your job:
-**replace** the TODO marker with a real one-sentence descriptive label.
-
-The label is what the ZSC router compares future sources against, so the
-more topical and specific the better:
-
-- ❌ Bad:  `Notes about science`
-- ✅ Good: `Research on dietary interventions for cognitive decline in adults over 60.`
-- ❌ Bad:  `Articles I read`
-- ✅ Good: `Practical guides for home-improvement DIY projects on older houses.`
-
-Constraints: plain UTF-8 text, one sentence, **no trailing newline**, target
-60–180 characters, must NOT start with `TODO:`.
+When the router reports `is_new=true` (or when filing into an existing
+project whose label still starts with `TODO:`), generate a one-sentence
+descriptive label and write it via:
 
 ```bash
-LABEL_FILE="$USERPROFILE/Paperwik/Vault/Projects/<Project>/.paperwik/label.txt"
-printf '%s' 'Research on dietary interventions for cognitive decline in adults over 60.' > "$LABEL_FILE"
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+uv run "$PAPERWIK_PLUGIN/scripts/populate_label.py" \
+    --project "<project_name>" \
+    --label "<one descriptive sentence, 60-180 chars, must NOT start with TODO:>"
 ```
 
-When `is_new=false` (filing into an existing project), check whether the
-existing label still starts with `TODO:` — if so, this is a project whose
-label was never populated; **populate it now** based on the source you're
-ingesting + a quick read of the existing summary pages. Otherwise leave
-the existing label alone.
+Examples of good labels:
 
-### Step 5. Write the summary page
+- ✅ `Research on dietary interventions for cognitive decline in adults over 60.`
+- ✅ `Practical guides for home-improvement DIY projects on older houses.`
+- ✅ `Open-source ORDBMS internals: MVCC, replication, partitioning, pgvector.`
 
-Create a new markdown file at
-`%USERPROFILE%\Paperwik\Vault\Projects\<project_name>\<slug-of-title>.md`.
-Use the frontmatter and structure from Step 3. Use standard markdown links —
+Examples that the tool will REJECT:
+
+- ❌ `TODO: ...` (still has the placeholder marker)
+- ❌ `Notes about science` (too short, not topical)
+- ❌ `Articles I read about various things` (vague)
+- ❌ Empty or whitespace-only string
+
+The tool validates and writes; you don't need to verify the file content
+manually. If the call exits non-zero, fix the `--label` argument and re-run.
+
+When `is_new=false` AND the existing label is real (no TODO marker, length
+> 20 chars), skip this step entirely — leave the existing label alone.
+
+### Step 5. Write the summary page — use `write_summary.py`
+
+> **(v0.6.4)** Hand-writing summary YAML was unreliable across v0.6.0–v0.6.3 sandbox testing — the agent kept omitting `source_type:`. v0.6.4 routes summary generation through a dedicated tool that requires `source_type` as input and emits a properly-populated YAML frontmatter. The indexer (Step 7) will now REFUSE to run if no summary in the project has `source_type:` in its YAML.
+
+Don't hand-write the summary page. Instead, assemble a JSON spec and call
+`write_summary.py`:
+
+```bash
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+SPEC_FILE=$(mktemp --suffix=.json)
+cat > "$SPEC_FILE" << 'EOF'
+{
+  "project": "PostgreSQL",
+  "source_type": "article",
+  "source": "https://grokipedia.com/page/PostgreSQL",
+  "source_title": "PostgreSQL — Grokipedia",
+  "title": "Grokipedia Overview",
+  "tags": ["postgresql", "database", "sql", "ordbms", "oss"],
+  "body": "Encyclopedic overview of PostgreSQL: history, architecture, ...\n\n## Definition\n\n..."
+}
+EOF
+uv run "$PAPERWIK_PLUGIN/scripts/write_summary.py" --json "$SPEC_FILE"
+```
+
+**Required spec fields:** `project`, `source_type`, `title`, `body`.
+**`source_type`** MUST equal the value from the router's JSON output in
+Step 2 (one of: academic / article / newsletter / social / journal /
+reference). The tool validates and refuses unknown source types.
+
+The tool prints `{"path": "...", "source_type": "..."}` on success.
+Capture `path` for use in Step 7 (indexer takes the source path, but you
+need to know the summary path for Step 6 entity-page cross-references).
+
+You CAN still write the body in markdown freely (cross-links to entity
+pages, code blocks, headings, etc.). The tool generates only the YAML
+frontmatter; the body is yours. Use standard markdown links —
 `[Other Page](../Project/Other-Page.md)` — not wikilinks.
-
-**Verify** the YAML frontmatter contains a `source_type:` field whose value
-equals the `source_type` from the router output in Step 2. This is pre-flight
-check #2.
 
 ### Step 6. Create or update entity pages
 
@@ -236,10 +267,34 @@ uv run "$PAPERWIK_PLUGIN/scripts/index_source.py" --source "<path>" --project "<
 Capture the `chunks` count from the indexer's JSON output. This is pre-flight
 check #4.
 
+**v0.6.4: indexer refuses to run if Steps 4 and 5 weren't done correctly.**
+Specifically, the indexer pre-flight checks fail with exit code 3 and a
+`"kind": "preflight_failed"` JSON error if:
+
+- The project's `.paperwik/label.txt` is empty or still starts with `TODO:`
+  → fix by running `populate_label.py` (Step 4).
+- The project's directory has summary `.md` files but none contain a
+  `source_type:` YAML field → fix by regenerating the summary via
+  `write_summary.py` (Step 5).
+
+The error message tells you exactly which fix to apply. Address it and
+re-run the indexer; do NOT pass `--skip-preflight` (that flag exists
+only for migration / fix-up scenarios, never for normal ingest).
+
 **Low-memory note (v0.6.1+):** the indexer caps fastembed's batch size at
 4 by default to avoid the ONNX MatMul OOM that hits 4 GB Windows Sandboxes.
 On big-RAM machines you can override via `PAPERWIK_EMBED_BATCH_SIZE=32`
 (or higher) for faster ingest. Don't worry about this in routine use.
+
+**v0.6.3: chunker hard cap.** Pathological large paragraphs (an 18 KB
+paragraph in the v0.6.2 sandbox crashed ONNX) are now post-processed and
+split on whitespace boundaries to stay under `MAX_CHUNK_CHARS = 2000`.
+Transparent to you; just expect slightly more chunks on big paragraphs.
+
+**v0.6.3: indexer self-heals the projects table.** If a project name was
+never registered via the router (e.g., manual fix-up flows), the indexer
+now writes the projects-table row from the chunk embeddings during this
+step. Transparent; no action needed.
 
 ### Step 8. Update `index.md` and `log.md`
 
@@ -316,12 +371,19 @@ in Obsidian's sidebar as you work — mention that if it's the first ingest.
   your own topical read. v0.6.2's cold-start rule already handles the
   "only one prior project" false-positive case. If the assignment still
   seems wrong, file a bug — don't override inline.
-- **Always populate `.paperwik/label.txt` when creating a new project,
-  replacing the TODO marker with a real label.** (v0.6.2) The TODO marker
-  is observable but it disables ZSC for the project until replaced;
-  shipping a project still in TODO state defeats the routing improvement.
+- **Use `populate_label.py` to write `.paperwik/label.txt` — never hand-write it.** (v0.6.4)
+  The tool validates the label and refuses TODO/empty/too-short input.
+  Hand-writing the file is the failure mode v0.6.0–v0.6.3 sandboxes
+  consistently hit. The indexer (Step 7) refuses to run if any project
+  is still in TODO state.
+- **Use `write_summary.py` to write summary pages — never hand-write them.** (v0.6.4)
+  The tool requires `source_type` as input and emits proper YAML
+  frontmatter. The indexer refuses to run if no summary in the project
+  has `source_type:` in its YAML.
 - **Source_type comes from the router** (v0.6.2), not from the subagent.
-  Pass it into the subagent's prompt; verify it lands in the summary YAML.
+  Pass it into the subagent's prompt AND into the `write_summary.py` JSON
+  spec. The subagent's drafted abstract + key points become the `body`
+  field of the spec; everything else (frontmatter) is the tool's job.
 - **Never ingest content the user hasn't placed in `Vault/Inbox/`.** If they
   give you a URL, fetch the page and save it into `Vault/Inbox/` first
   (Step 1).
@@ -331,3 +393,6 @@ in Obsidian's sidebar as you work — mention that if it's the first ingest.
 - **If Self-check (Step 10) fails, do not report success to the user.** Go
   back to the offending step. The four pre-flight outputs are a hard
   contract; missing any one is a failed ingest, not a quirky one.
+- **`--skip-preflight` on the indexer is for migration / fix-up only.** Never
+  use it during normal ingest. The pre-flight is the architectural
+  enforcement that fixed v0.6.0–v0.6.3's silent agent-skip failure mode.

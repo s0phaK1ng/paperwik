@@ -28,6 +28,58 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.6.4 -- architectural enforcement of YAML source_type and
+    .paperwik/label.txt population. v0.6.0/v0.6.1/v0.6.2/v0.6.3 sandbox
+    testing showed that ANY operation we leave as "agent reads tool
+    output and writes a file" gets skipped. SKILL.md prose tightening
+    (D11), MANDATORY framing, pre-flight checklists, and self-check
+    gates all failed to make the agent reliably:
+      (a) put `source_type:` into summary-page YAML
+      (b) replace the TODO marker in .paperwik/label.txt with a real
+          descriptive label
+    v0.6.4 takes the D12 approach all the way: move both operations
+    INTO tools, and gate the indexer on their outputs.
+
+    Two new scripts:
+
+    1) scripts/write_summary.py -- generates a summary-page markdown
+       file from a JSON spec. source_type is REQUIRED and validated
+       against the 6-type taxonomy. The agent assembles a JSON spec
+       with project / source_type / title / body / source / tags /
+       source_title; the tool emits the file with proper YAML
+       frontmatter. Replaces hand-writing the .md file.
+
+    2) scripts/populate_label.py -- writes a validated descriptive
+       label to <Project>/.paperwik/label.txt. Refuses --label that's
+       empty, still has the TODO marker, shorter than 20 chars, or
+       longer than 300. Replaces the hand-written `printf '%s' ... >
+       label.txt` pattern.
+
+    index_source.py adds pre-flight checks (--skip-preflight to bypass
+    for migration / fix-up only):
+
+    3) Refuses to index if the project's .paperwik/label.txt is empty
+       or still starts with TODO:. Forces populate_label.py to have
+       run successfully first. Exits with kind="preflight_failed" and
+       the exact remediation command.
+
+    4) Refuses to index if the project directory has summary .md files
+       but none contain a `source_type:` YAML field. Forces
+       write_summary.py to have run successfully first.
+
+    paperwik-ingest/SKILL.md updated:
+      - Step 4 (was: hand-write label) -> use populate_label.py
+      - Step 5 (was: hand-write summary) -> use write_summary.py
+      - Step 7 (indexer) explains the new pre-flight refusals
+      - Rules section: "Use ... -- never hand-write" for both files
+
+    No new Anthropic API dependency. No change to route_content() or
+    classify() signatures (per D3, D4 -- stable contracts).
+    write_summary and populate_label have no dependencies; the indexer
+    pre-flight uses stdlib only.
+
+    Pre-commit parse-tested per memory rule. PARSE OK.
+
     v0.6.3 -- three mechanical fixes uncovered by the v0.6.2 sandbox run:
 
     1) Added `onnx>=1.15.0` to PEP-723 deps in classify.py,
