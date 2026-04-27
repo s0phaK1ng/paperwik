@@ -28,6 +28,35 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.6.7 -- classifier accuracy tuning. The v0.6.6 sandbox confirmed
+    classify.py runs end-to-end (no errors, INT8 model cached, session
+    runs) but showed the classifier's softmax output was essentially
+    uniform across all 6 labels (~0.167 confidence each). That meant
+    every ingest was falling to the "article" default per the SKILL.md
+    confidence threshold rule -- so source_type wasn't carrying real
+    signal even though the architecture was working.
+
+    Root cause: the v0.6.0 hypothesis template + labels were too
+    verbose for the NLI head of DeBERTa-v3-base-zeroshot-v2.0-c. The
+    template was a meta-statement ("This document is best categorized
+    as a {} by its format and structure.") and the labels were
+    run-on descriptive phrases ("peer-reviewed academic paper,
+    preprint, or technical research report"). The model couldn't
+    discriminate between hypotheses where the label slot dwarfed the
+    template; entailment scores collapsed to roughly uniform.
+
+    Fix: switch to the canonical NLI pattern -- a clean declarative
+    sentence template + short noun-phrase labels that complete it
+    grammatically. New hypothesis examples:
+      "This text is an academic paper."
+      "This text is a news article or blog post."
+      "This text is a reference manual or documentation."
+
+    The 6-type taxonomy (D8) is unchanged. Only the phrasing the NLI
+    model sees has changed.
+
+    Pre-commit parse-tested per memory rule. PARSE OK.
+
     v0.6.6 -- last classifier-correctness fix. Followup to v0.6.5.
 
     The v0.6.5 sandbox test got past quantization (sympy was the

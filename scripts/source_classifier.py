@@ -64,21 +64,37 @@ from typing import Any
 from classify import classify, DEFAULT_TEMPLATE  # noqa: E402
 
 
-# Hypothesis template tuned for source-type classification. Notice it asks
-# about FORMAT, not topic — distinguishes from project_router's TOPIC-focused
-# template.
-SOURCE_TYPE_TEMPLATE = "This document is best categorized as a {} by its format and structure."
+# v0.6.7: hypothesis template + label phrasing tuned for the NLI head of
+# DeBERTa-v3-base-zeroshot-v2.0-c.
+#
+# The v0.6.0-v0.6.6 versions used a verbose meta-template
+# ("This document is best categorized as a {} by its format and structure.")
+# combined with run-on descriptive labels ("peer-reviewed academic paper,
+# preprint, or technical research report"). The v0.6.6 sandbox showed the
+# resulting hypotheses diluted the entailment signal so badly that the
+# softmax across 6 labels was essentially uniform (~0.167 confidence per
+# label) -- meaning every classification effectively fell to the
+# "article" default per the SKILL.md confidence threshold.
+#
+# v0.6.7 switches to the canonical NLI pattern: a clean declarative
+# sentence template + short noun-phrase labels that complete it
+# grammatically. This produces hypotheses like:
+#   "This text is an academic paper."
+#   "This text is a news article or blog post."
+#   "This text is a reference manual or documentation."
+# which the model can score with much sharper entailment signal.
+#
+# The 6-type taxonomy (D8) is unchanged. Only the phrasing the NLI
+# model sees has changed.
+SOURCE_TYPE_TEMPLATE = "This text is {}."
 
-# Descriptive label expansions. We give the NLI model richer phrases than the
-# bare type names so the entailment signal is stronger. These descriptive
-# labels are what the model sees; the returned `type` is the short form.
 SOURCE_TYPES: dict[str, str] = {
-    "academic":   "peer-reviewed academic paper, preprint, or technical research report",
-    "article":    "web article, blog post, or piece of journalism",
-    "newsletter": "email newsletter with subscribe and unsubscribe boilerplate",
-    "social":     "social media post, forum thread, or short online discussion",
-    "journal":    "personal journal entry, diary, or daily note",
-    "reference":  "reference documentation, manual, glossary, or lookup material",
+    "academic":   "an academic paper",
+    "article":    "a news article or blog post",
+    "newsletter": "an email newsletter",
+    "social":     "a social media post",
+    "journal":    "a personal diary entry",
+    "reference":  "a reference manual or documentation",
 }
 
 # Truncate to the first N chars for type classification. The signal is
