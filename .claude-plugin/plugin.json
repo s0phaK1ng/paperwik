@@ -1,7 +1,7 @@
 {
   "name": "pw",
   "description": "Paperwik — agent-maintained Obsidian knowledge base. The LLM reads your sources, writes summary pages, maintains cross-references, and builds a persistent wiki that compounds over time. Slash commands are prefixed with /pw: for brevity. Marketplace + brand remain 'paperwik'; only the plugin identifier is short.",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "author": {
     "name": "s0phak1ng",
     "url": "https://github.com/s0phak1ng"

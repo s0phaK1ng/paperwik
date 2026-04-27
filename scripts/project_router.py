@@ -5,16 +5,19 @@
 #     "anthropic>=0.40.0",
 #     "onnxruntime>=1.16.3",
 #     "onnx>=1.15.0",
+#     "sympy>=1.12.0",
 #     "tokenizers>=0.15.0",
 #     "numpy>=1.26.0",
 #     "huggingface-hub>=0.20.0",
 # ]
 # ///
 #
-# v0.6.3: `onnx` added (see classify.py for the rationale -- required by
-# onnxruntime.quantization.quantize_dynamic at runtime; without it, every
-# router invocation silently failed source_type classification and
-# defaulted to "article").
+# v0.6.3: `onnx` added (required by onnxruntime.quantization.quantize_dynamic).
+# v0.6.5: `sympy` added (required by onnxruntime.tools.symbolic_shape_infer
+# which is imported transitively when onnxruntime.quantization loads). The
+# router imports source_classifier which imports classify, so the router's
+# PEP-723 header has to declare the full transitive dep set used by classify
+# (uv only resolves the entry-script header, not transitive imports).
 #
 # Python pinned to 3.12.x for wheel compatibility. See embeddings.py
 # for the detailed reason (py-rust-stemmers / MSVC-link shadow).

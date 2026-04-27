@@ -3,6 +3,7 @@
 # dependencies = [
 #     "onnxruntime>=1.16.3",
 #     "onnx>=1.15.0",
+#     "sympy>=1.12.0",
 #     "tokenizers>=0.15.0",
 #     "numpy>=1.26.0",
 #     "huggingface-hub>=0.20.0",
@@ -12,10 +13,17 @@
 # v0.6.3: `onnx` added explicitly. onnxruntime.quantization.quantize_dynamic
 # (used in _ensure_int8_model) requires the `onnx` package at runtime to
 # parse and re-emit the FP32 ONNX graph; onnxruntime alone is the inference
-# engine and doesn't pull `onnx` as a transitive dep. Without this, the
-# first call to classify() crashed with ModuleNotFoundError("No module
-# named 'onnx'") -- the v0.6.0/v0.6.1/v0.6.2 sandboxes all silently fell
-# through to source_type=article defaults because of this missing dep.
+# engine and doesn't pull `onnx` as a transitive dep.
+#
+# v0.6.5: `sympy` added explicitly. onnxruntime.quantization indirectly
+# imports onnxruntime.tools.symbolic_shape_infer, which requires sympy
+# for symbolic shape inference and isn't pulled by onnxruntime or onnx
+# transitively. Without it, _ensure_int8_model fails with
+# ImportError("sympy is required for symbolic shape inference") AT IMPORT
+# TIME of onnxruntime.quantization -- which means quantize_dynamic never
+# runs and INT8 caching never completes. v0.6.4 sandbox testing surfaced
+# this; classify() defaulted to source_type=article fallback for the
+# entire v0.6.0-v0.6.4 series because of this hidden dep chain.
 #
 # Python pinned to 3.12.x for wheel compatibility (see embeddings.py).
 """

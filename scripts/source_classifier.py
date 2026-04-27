@@ -3,6 +3,7 @@
 # dependencies = [
 #     "onnxruntime>=1.16.3",
 #     "onnx>=1.15.0",
+#     "sympy>=1.12.0",
 #     "tokenizers>=0.15.0",
 #     "numpy>=1.26.0",
 #     "huggingface-hub>=0.20.0",
@@ -10,6 +11,7 @@
 # ///
 #
 # v0.6.3: `onnx` added (see classify.py header for the rationale).
+# v0.6.5: `sympy` added (see classify.py header).
 """
 source_classifier.py -- Classify ingested sources by document TYPE.
 

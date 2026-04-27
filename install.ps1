@@ -28,6 +28,36 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.6.5 -- one more transitive dep. Followup to v0.6.3 / v0.6.4.
+
+    Added `sympy>=1.12.0` to PEP-723 deps in classify.py,
+    source_classifier.py, and project_router.py.
+    onnxruntime.quantization indirectly imports
+    onnxruntime.tools.symbolic_shape_infer, which requires sympy for
+    symbolic shape inference. sympy is NOT pulled transitively by
+    onnxruntime or onnx -- it must be declared explicitly. Without it,
+    the quantize_dynamic import itself fails with:
+
+        ImportError: sympy is required for symbolic shape inference.
+        Install with: pip install sympy
+
+    This means the v0.6.0-v0.6.4 series silently never completed
+    quantization for any user, no matter how clean the code path was.
+    The INT8 model was never written; classify.py always defaulted
+    source_type to "article" via the v0.6.2 router fallback. The
+    sandbox test of `source_classifier.py --text ...` directly
+    surfaced this transitive-dep failure at the import-of-
+    onnxruntime.quantization step.
+
+    v0.6.4 architectural enforcement of YAML source_type + label.txt
+    still works correctly -- the indexer pre-flight forces the agent
+    to populate both, even when classify.py itself fails. v0.6.5 just
+    closes the last loop: classify.py now succeeds end-to-end, the
+    INT8 model gets cached, and source_type values become real
+    classifications instead of "article" defaults.
+
+    Pre-commit parse-tested per memory rule. PARSE OK.
+
     v0.6.4 -- architectural enforcement of YAML source_type and
     .paperwik/label.txt population. v0.6.0/v0.6.1/v0.6.2/v0.6.3 sandbox
     testing showed that ANY operation we leave as "agent reads tool
