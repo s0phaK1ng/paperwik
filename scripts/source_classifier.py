@@ -2,11 +2,14 @@
 # requires-python = ">=3.12,<3.13"
 # dependencies = [
 #     "onnxruntime>=1.16.3",
+#     "onnx>=1.15.0",
 #     "tokenizers>=0.15.0",
 #     "numpy>=1.26.0",
 #     "huggingface-hub>=0.20.0",
 # ]
 # ///
+#
+# v0.6.3: `onnx` added (see classify.py header for the rationale).
 """
 source_classifier.py -- Classify ingested sources by document TYPE.
 

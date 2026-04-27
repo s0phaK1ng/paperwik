@@ -2,11 +2,20 @@
 # requires-python = ">=3.12,<3.13"
 # dependencies = [
 #     "onnxruntime>=1.16.3",
+#     "onnx>=1.15.0",
 #     "tokenizers>=0.15.0",
 #     "numpy>=1.26.0",
 #     "huggingface-hub>=0.20.0",
 # ]
 # ///
+#
+# v0.6.3: `onnx` added explicitly. onnxruntime.quantization.quantize_dynamic
+# (used in _ensure_int8_model) requires the `onnx` package at runtime to
+# parse and re-emit the FP32 ONNX graph; onnxruntime alone is the inference
+# engine and doesn't pull `onnx` as a transitive dep. Without this, the
+# first call to classify() crashed with ModuleNotFoundError("No module
+# named 'onnx'") -- the v0.6.0/v0.6.1/v0.6.2 sandboxes all silently fell
+# through to source_type=article defaults because of this missing dep.
 #
 # Python pinned to 3.12.x for wheel compatibility (see embeddings.py).
 """

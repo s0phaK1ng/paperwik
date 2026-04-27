@@ -72,7 +72,7 @@ from pathlib import Path
 
 # Local imports (same scripts/ directory)
 try:
-    from embeddings import embed_batch, to_blob
+    from embeddings import embed_batch, to_blob, mean_vector
     from graph import extract_and_store
 except ImportError as exc:
     print(f"FATAL: cannot import sibling modules: {exc}", file=sys.stderr)
@@ -162,6 +162,18 @@ TARGET_CHUNK_CHARS = 1000
 MIN_CHUNK_CHARS = 100           # drop pieces smaller than this (headers-only, etc.)
 LARGE_PARA_THRESHOLD = TARGET_CHUNK_CHARS * 2
 
+# v0.6.3: HARD upper bound on any single chunk. Beyond this size, the
+# downstream embedder (fastembed -> ONNX MatMul kernel) tries to allocate
+# multi-GB scratch buffers per call, which crashes on low-RAM machines
+# even at batch_size=1. The PG article in the v0.6.2 sandbox had a single
+# 18 KB paragraph with no sentence boundaries the previous splitter could
+# find, producing an 18 KB chunk that demanded a 6 GB ONNX allocation and
+# blew up. We post-process every chunk after the paragraph/sentence
+# splitters and force-split anything that's still too large on whitespace
+# / line boundaries. Slightly worse semantic boundaries, but bounded
+# memory.
+MAX_CHUNK_CHARS = 2000
+
 
 def _split_large_paragraph(paragraph: str, target_size: int) -> list[str]:
     """Split a single oversized paragraph on sentence-ish boundaries."""
@@ -183,6 +195,38 @@ def _split_large_paragraph(paragraph: str, target_size: int) -> list[str]:
     return pieces
 
 
+def _force_cap_chunk(chunk: str, max_chars: int) -> list[str]:
+    """v0.6.3: hard-split a chunk that's still oversized after the
+    paragraph + sentence splitters. Tries to break on (in order of
+    preference): newline, period+space, comma+space, then bare whitespace.
+
+    Bounded: every output piece is <= max_chars.
+    """
+    if len(chunk) <= max_chars:
+        return [chunk]
+
+    pieces: list[str] = []
+    i = 0
+    n = len(chunk)
+    while i < n:
+        end = min(i + max_chars, n)
+        if end < n:
+            # Search backward from end for a good break point in the
+            # second half of [i, end). Prefer newlines, then sentence
+            # ends, then commas, then any whitespace. If nothing useful,
+            # accept a hard split at max_chars.
+            for sep in ("\n", ". ", "! ", "? ", ", ", " "):
+                k = chunk.rfind(sep, i + max_chars // 2, end)
+                if k != -1:
+                    end = k + len(sep)
+                    break
+        piece = chunk[i:end].strip()
+        if piece:
+            pieces.append(piece)
+        i = end
+    return pieces
+
+
 def chunk_text(text: str, target_size: int = TARGET_CHUNK_CHARS) -> list[str]:
     """Paragraph-aware chunker.
 
@@ -190,6 +234,10 @@ def chunk_text(text: str, target_size: int = TARGET_CHUNK_CHARS) -> list[str]:
     * Greedily groups paragraphs up to ~target_size chars each.
     * If a single paragraph is larger than 2*target_size, splits it further
       on sentence boundaries.
+    * v0.6.3: post-process every chunk against MAX_CHUNK_CHARS as a hard
+      cap; any oversized chunk is force-split on whitespace boundaries.
+      Defends against pathological paragraphs (no sentence punctuation,
+      single quote blocks, etc.).
     * Drops trivially short pieces.
     """
     text = re.sub(r"\n{3,}", "\n\n", text.strip())
@@ -224,8 +272,13 @@ def chunk_text(text: str, target_size: int = TARGET_CHUNK_CHARS) -> list[str]:
     if current:
         chunks.append("\n\n".join(current))
 
+    # v0.6.3: enforce MAX_CHUNK_CHARS as a hard cap on every chunk.
+    capped: list[str] = []
+    for ch in chunks:
+        capped.extend(_force_cap_chunk(ch, MAX_CHUNK_CHARS))
+
     # Drop tiny chunks (title-only lines, isolated short headers, etc.)
-    return [c for c in chunks if len(c) >= MIN_CHUNK_CHARS]
+    return [c for c in capped if len(c) >= MIN_CHUNK_CHARS]
 
 
 # --------------------------------------------------------------------------- #
@@ -248,6 +301,68 @@ def _to_vault_relative(source_path: Path) -> str:
         # Source is outside the vault (e.g. still in Inbox on a different drive) —
         # fall back to the absolute path so we at least record something useful.
         return str(source_path)
+
+
+def _slugify(name: str) -> str:
+    """Mirror of project_router._slugify; kept local to avoid an import."""
+    slug = re.sub(r"\s+", "-", name.lower().strip())
+    slug = re.sub(r"[^a-z0-9-]", "", slug)
+    return slug[:50] or "project"
+
+
+def _ensure_project_row(
+    conn: sqlite3.Connection,
+    project: str,
+    chunk_embeddings: list[list[float]],
+    ts: str,
+) -> None:
+    """v0.6.3: ensure the projects table has a row for `project`.
+
+    If a row already exists (matched by name), do nothing. Otherwise
+    insert one with a centroid computed from the chunk embeddings being
+    indexed (mean vector). One source's worth of chunks is a noisy
+    centroid signal but is far better than the project being absent
+    from routing decisions entirely.
+
+    Self-healing for the v0.6.0/v0.6.1/v0.6.2 failure mode where the
+    agent ran the indexer without first running the router. With this
+    fix, programmatic / fix-up / drag-and-drop ingest flows can never
+    leave a project orphaned from the routing system.
+    """
+    from embeddings import to_blob, mean_vector  # type: ignore
+
+    existing = conn.execute(
+        "SELECT id FROM projects WHERE name = ?",
+        (project,),
+    ).fetchone()
+    if existing is not None:
+        return  # Row already present; nothing to do.
+
+    # Compute centroid from chunks. mean_vector raises on empty list, but
+    # callers always have >=1 chunk by this point (RuntimeError is raised
+    # earlier if chunks is empty).
+    centroid = mean_vector(chunk_embeddings)
+    centroid_blob = to_blob(centroid)
+
+    # Slug must be unique; on collision append a numeric suffix until free.
+    base_slug = _slugify(project)
+    slug = base_slug
+    suffix = 1
+    while conn.execute("SELECT 1 FROM projects WHERE slug = ?", (slug,)).fetchone():
+        suffix += 1
+        slug = f"{base_slug}-{suffix}"
+
+    conn.execute(
+        """INSERT INTO projects
+               (name, slug, centroid_embedding, source_count, last_activity_ts, archived, created_ts)
+           VALUES (?, ?, ?, 0, ?, 0, ?)""",
+        (project, slug, centroid_blob, ts, ts),
+    )
+    conn.commit()
+    log(
+        f"Self-healed missing projects-table row for '{project}' "
+        f"(slug='{slug}'); centroid computed from {len(chunk_embeddings)} chunk(s)."
+    )
 
 
 def _upsert_source(
@@ -335,6 +450,22 @@ def index_source(
 
     conn = sqlite3.connect(str(db_path))
     try:
+        # v0.6.3: ensure a projects-table row exists for `project` BEFORE we
+        # insert sources/chunks. The router (project_router._create_project)
+        # is normally responsible for inserting projects rows, but if the
+        # agent ever runs the indexer without first running the router
+        # (programmatic ingest, manual fix-up, drag-and-drop UI without
+        # the routing step, etc.), the projects table will silently lack
+        # the row -- which makes future routing decisions IGNORE this
+        # project as a candidate, even though its content is fully
+        # indexed in chunks/sources.
+        #
+        # Self-healing fix: INSERT OR IGNORE a projects row, computing
+        # the centroid from this source's chunk embeddings (mean of all
+        # chunks). One source is a noisy centroid signal but it's still
+        # vastly better than the project being absent.
+        _ensure_project_row(conn, project, embeddings, ts)
+
         # sources row
         source_id = _upsert_source(conn, project, title, rel_path, source_type, content_hash, ts)
         conn.commit()

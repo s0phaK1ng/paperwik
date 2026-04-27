@@ -4,11 +4,17 @@
 #     "fastembed>=0.4.0",
 #     "anthropic>=0.40.0",
 #     "onnxruntime>=1.16.3",
+#     "onnx>=1.15.0",
 #     "tokenizers>=0.15.0",
 #     "numpy>=1.26.0",
 #     "huggingface-hub>=0.20.0",
 # ]
 # ///
+#
+# v0.6.3: `onnx` added (see classify.py for the rationale -- required by
+# onnxruntime.quantization.quantize_dynamic at runtime; without it, every
+# router invocation silently failed source_type classification and
+# defaulted to "article").
 #
 # Python pinned to 3.12.x for wheel compatibility. See embeddings.py
 # for the detailed reason (py-rust-stemmers / MSVC-link shadow).

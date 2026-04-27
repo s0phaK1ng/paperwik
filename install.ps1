@@ -28,6 +28,46 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.6.3 -- three mechanical fixes uncovered by the v0.6.2 sandbox run:
+
+    1) Added `onnx>=1.15.0` to PEP-723 deps in classify.py,
+       source_classifier.py, and project_router.py. The
+       onnxruntime.quantization.quantize_dynamic call (used in
+       classify._ensure_int8_model on first ingest) requires the `onnx`
+       package at runtime to parse and re-emit the FP32 model graph;
+       onnxruntime alone is the inference engine and doesn't pull `onnx`
+       as a transitive dep. Without this, the router's embedded
+       classifier silently failed with ModuleNotFoundError("No module
+       named 'onnx'") and defaulted source_type to "article" forever --
+       which is what we observed in v0.6.0/v0.6.1/v0.6.2 sandbox runs.
+
+    2) Added a hard MAX_CHUNK_CHARS=2000 cap in
+       index_source.chunk_text(). The previous chunker only split on
+       paragraph + sentence boundaries; pathological paragraphs without
+       sentence punctuation (the PostgreSQL article had a single 18 KB
+       paragraph that hit this) produced single chunks too large for
+       the embedder. ONNX MatMul kernels then tried to allocate ~6 GB
+       of scratch space per call, crashing even at batch_size=1. The
+       new _force_cap_chunk() post-processor splits oversized chunks
+       on whitespace / line / period boundaries with a guaranteed
+       max_chars upper bound.
+
+    3) index_source.index_source() now calls
+       _ensure_project_row() before inserting sources/chunks. This
+       INSERT-OR-IGNOREs a projects-table row when missing, computing
+       a centroid from the source's chunk embeddings. Self-heals the
+       failure mode where the agent ran the indexer without first
+       running the router (programmatic ingest, manual fix-up flows,
+       drag-and-drop ingest paths) -- previously the project would be
+       fully indexed in chunks/sources but invisible to future routing
+       decisions, requiring a manual SQL backfill. v0.6.2 sandbox hit
+       this on the "Open Source" project.
+
+    No new Anthropic API dependency. classify() and route_content()
+    signatures unchanged.
+
+    Pre-commit parse-tested per memory rule. PARSE OK.
+
     v0.6.2 -- architectural enforcement (the v0.6.1 SKILL.md prose
     tightening didn't work; the agent kept skipping classification and
     label generation on URL-style ingests). Instead of trying harder
