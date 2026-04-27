@@ -3,20 +3,20 @@
 # requires-python = ">=3.11"
 # dependencies = ["pyyaml>=6.0"]
 # ///
-"""Validate a research output markdown file against the non-negotiable
-format contract (paperwik decision equivalent of CoWork #305).
+"""Validate a deep-research output markdown file against the non-negotiable
+format contract (decision #305).
 
-Action item A6 (paperwik action item #408). Must be run BEFORE the engine
-writes the final file to the drop target. Blocks writes on any violation --
-a malformed document would pollute the ingestion pipeline.
+Action item A6. Must be run BEFORE the engine writes the final file to the
+drop target. Blocks writes on any violation — a malformed document would
+pollute the ingestion pipeline.
 
 Usage:
     uv run scripts/output_validator.py --file /path/to/final.md
 
 Exit codes:
-    0  valid -- safe to write
-    1  invalid -- one or more contract violations (prints them to stderr)
-    2  fatal -- could not parse the file at all
+    0  valid — safe to write
+    1  invalid — one or more contract violations (prints them to stderr)
+    2  fatal — could not parse the file at all
 
 Checks:
     1. YAML frontmatter present (opens with `---`, closes with `---`)
@@ -28,13 +28,9 @@ Checks:
     5. Sources section contains a markdown table with at least: ID, URL, Title, Access date
     6. Every citation in the body (`[s<n>_c<n>]`) corresponds to a row in the
        Sources table with the same ID (OR a chunk_id that the run's
-       chunks.json maps to a source -- but that validation is a warning, not
+       chunks.json maps to a source — but that validation is a warning, not
        a hard block, since this script doesn't take the chunks.json path)
     7. Total word count >= 3000 (minimum document length guard)
-
-Ported verbatim from CoWork deep-research skill at 2026-04-24 (paperwik
-action item #408). No paperwik-specific changes -- the YAML contract is
-identical across both deployments.
 """
 from __future__ import annotations
 
@@ -52,7 +48,14 @@ except ImportError:
 
 
 REQUIRED_FRONTMATTER_KEYS = {"topic", "date", "research_tool", "cost", "sources_count"}
-REQUIRED_H2_SECTIONS = ["## Context", "## Findings", "## Gaps & Caveats", "## Sources"]
+# v2 (2026-04-27, supersedes part of decision #305):
+# Required H2 sections relaxed to allow topic-specific section names.
+# REQUIRED: ## Context first, ## Sources last, plus >=3 other H2 sections in between.
+# RECOMMENDED (warning only): ## Gaps & Caveats — emit warning if absent, not a hard error.
+REQUIRED_H2_FIRST = "## Context"
+REQUIRED_H2_LAST = "## Sources"
+RECOMMENDED_H2 = "## Gaps & Caveats"
+MIN_OTHER_H2_SECTIONS = 3  # excluding Context and Sources
 CITATION_RE = re.compile(r"\[((?:s\d+_c\d+)(?:\s*,\s*s\d+_c\d+)*)\]")
 # Sources table row: | s1_c1 | https://... | Title | 2026-... |
 SOURCES_ROW_RE = re.compile(
@@ -105,20 +108,52 @@ def main() -> int:
         if "cost" in fm and fm["cost"] is not None and not isinstance(fm["cost"], (int, float)):
             errors.append(f"Frontmatter `cost` must be a number or null, got {type(fm['cost']).__name__}")
 
-    # Check 3 & 4: required H2 sections in order
+    # Check 3: structural H2 sections (v2 relaxed contract)
+    # Required: ## Context first, ## Sources last
+    # Required: >=3 other H2 sections between Context and Sources (any topic-specific names)
+    # Recommended (warning only): ## Gaps & Caveats
     body_to_check = body if fm is not None else text
-    last_idx = -1
-    for section in REQUIRED_H2_SECTIONS:
-        idx = body_to_check.find(f"\n{section}\n")
-        # Allow the section to be first (no leading newline)
-        if idx == -1:
-            idx = body_to_check.find(f"{section}\n") if body_to_check.startswith(section) else -1
-        if idx == -1:
-            errors.append(f"Required H2 section missing: `{section}`")
+
+    # Find all H2 section headers (lines starting with "## " at line boundaries)
+    h2_pattern = re.compile(r"(?:^|\n)(## [^\n]+)", re.MULTILINE)
+    h2_matches = [(m.start(), m.group(1).strip()) for m in h2_pattern.finditer(body_to_check)]
+
+    if not h2_matches:
+        errors.append("No H2 sections found in body")
+    else:
+        # First H2 must be ## Context
+        first_h2_pos, first_h2 = h2_matches[0]
+        if first_h2 != REQUIRED_H2_FIRST:
+            errors.append(f"First H2 must be `{REQUIRED_H2_FIRST}`, got `{first_h2}`")
+
+        # ## Sources must be PRESENT (not necessarily last — trailing appendices like
+        # ## Verification are allowed after Sources)
+        h2_titles = [h for _, h in h2_matches]
+        if REQUIRED_H2_LAST not in h2_titles:
+            errors.append(f"Required H2 missing: `{REQUIRED_H2_LAST}` (must be present; trailing H2s after it are allowed)")
         else:
-            if idx < last_idx:
-                errors.append(f"Required H2 sections out of order: `{section}` appears before an earlier required section")
-            last_idx = idx
+            # Sources must come AFTER Context (not in the first half)
+            sources_idx_in_h2 = h2_titles.index(REQUIRED_H2_LAST)
+            context_idx_in_h2 = h2_titles.index(REQUIRED_H2_FIRST) if REQUIRED_H2_FIRST in h2_titles else 0
+            if sources_idx_in_h2 <= context_idx_in_h2:
+                errors.append(f"`{REQUIRED_H2_LAST}` must come after `{REQUIRED_H2_FIRST}`")
+
+            # Count H2 sections strictly between Context and Sources
+            intermediate = h2_titles[context_idx_in_h2 + 1: sources_idx_in_h2]
+            if len(intermediate) < MIN_OTHER_H2_SECTIONS:
+                errors.append(
+                    f"Body needs at least {MIN_OTHER_H2_SECTIONS} other H2 sections "
+                    f"between `{REQUIRED_H2_FIRST}` and `{REQUIRED_H2_LAST}`; "
+                    f"found {len(intermediate)}: {intermediate}"
+                )
+
+        # Recommended Gaps & Caveats (warning only)
+        if RECOMMENDED_H2 not in h2_titles:
+            warnings.append(
+                f"Recommended section `{RECOMMENDED_H2}` is absent. "
+                "This section is the conventional home for unresolved questions and single-source claims; "
+                "consider adding for ingestion clarity."
+            )
 
     # Check 5: Sources table
     sources_idx = body_to_check.find("## Sources")
@@ -142,7 +177,7 @@ def main() -> int:
         sourced_ids = {m.group("id") for m in SOURCES_ROW_RE.finditer(sources_body)}
         missing_sources = cited_ids - sourced_ids
         if missing_sources:
-            # Hard error -- a citation with no source row is exactly the kind of
+            # Hard error — a citation with no source row is exactly the kind of
             # ingestion trap the Sanitizer is supposed to prevent
             errors.append(
                 f"Citations in body have no matching row in Sources table: "
@@ -165,12 +200,12 @@ def main() -> int:
     if warnings:
         print("WARNINGS:", file=sys.stderr)
         for w in warnings:
-            print(f"  ! {w}", file=sys.stderr)
+            print(f"  ⚠ {w}", file=sys.stderr)
 
     if errors:
         print(f"\nOUTPUT CONTRACT VIOLATIONS ({len(errors)}):", file=sys.stderr)
         for e in errors:
-            print(f"  X {e}", file=sys.stderr)
+            print(f"  ✗ {e}", file=sys.stderr)
         print(f"\nFile is INVALID. Refusing to write to drop target: {args.file}", file=sys.stderr)
         return 1
 

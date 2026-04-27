@@ -12,32 +12,60 @@ The JSON plan produced by Phase 1 (see `planner_prompt.md`). Specifically:
 
 ## Output
 
-A single file at `.claude/skills/state/deep-research/runs/<run_id>/chunks.json`
-containing a list of chunk records:
+When the orchestrator spawns multiple search subagents in parallel, each one
+writes its own file at:
+
+```
+.claude/skills/state/deep-research/runs/<run_id>/chunks/searcher_<N>.json
+```
+
+After all searchers complete, the orchestrator runs `scripts/merge_chunks.py`
+which normalizes, de-duplicates, sorts, and writes the unified
+`runs/<run_id>/chunks.json`.
+
+### Canonical chunk schema (STRICT)
+
+**Each searcher subagent's output MUST be a JSON list of objects matching
+this schema EXACTLY — no key renames, no nested envelopes, no extras.**
 
 ```json
 [
   {
     "chunk_id": "s3_c1",
     "section_id": "s3",
-    "source_url": "https://...",
-    "source_title": "...",
-    "fetched_at": "2026-04-22T15:30:00Z",
-    "text": "<~500-token passage of clean text>",
-    "sub_question_origin": "<the sub-question that surfaced this source>"
+    "source_url": "https://example.com/article",
+    "source_title": "Article Title Here",
+    "fetched_at": "2026-04-27T15:30:00Z",
+    "sub_question_origin": "What is X?",
+    "text": "<~500-token passage of clean text — the actual chunk body>"
   },
   ...
 ]
 ```
 
-Plus a parallel file `sources.json` with deduplicated source metadata:
+The seven keys are non-negotiable. The merge step (`scripts/merge_chunks.py`)
+will normalize known historical drift (key renames, nested `chunks` envelope —
+see the script's docstring for the four variants it accepts) but will fail
+loudly on unmappable variants. **Drift is wasted work; produce canonical JSON
+the first time.**
 
-```json
-[
-  {"source_id": 1, "url": "https://...", "title": "...", "first_seen": "2026-04-22T15:30:00Z"},
-  ...
-]
-```
+Per-key requirements:
+- **`chunk_id`**: `s<section>_c<n>` where `<section>` matches `section_id` and
+  `<n>` is a positive integer counting per section. Unique within the searcher's
+  output (the merger globally de-duplicates across searchers).
+- **`section_id`**: Must match a section in the run's `plan.json`.
+- **`source_url`**: Absolute URL (`http://` or `https://`).
+- **`source_title`**: Page title or "Unknown" if not extractable. Not empty.
+- **`fetched_at`**: ISO-8601 UTC timestamp. Approximate-now is fine.
+- **`sub_question_origin`**: The sub-question text from `plan.json` that drove
+  this fetch. `"(not recorded)"` is acceptable as a fallback but discouraged.
+- **`text`**: The chunk body. ~500 tokens preferred but the chunker decides.
+  Must not be empty.
+
+The companion `sources.json` (deduplicated metadata) is OPTIONAL — the
+Sources table in the final document can be reconstructed from `chunks.json`
+during stitching, so this file is only written if the orchestrator wants it
+for debugging.
 
 ---
 
@@ -149,5 +177,10 @@ to (a) unless the search budget is exhausted.
 
 - **v1 (2026-04-22, action item A3)** — Initial retrieval contract. Budget
   cap, chunking invocation, routing algorithm, error handling. Depends on
-  `scripts/chunk_text.py`. Ported verbatim from CoWork source at 2026-04-24
-  (action item #408).
+  `scripts/chunk_text.py`.
+- **v2 (2026-04-27, action item D2R-3, D2 retrospective)** — Added strict
+  canonical chunk schema with per-key requirements. Output reshaped: each
+  searcher writes its own `chunks/searcher_<N>.json`; orchestrator runs
+  `scripts/merge_chunks.py` to produce the unified `chunks.json`. Closes the
+  D2-surfaced problem of 4 search subagents producing 4 different shapes for
+  the same logical chunk.

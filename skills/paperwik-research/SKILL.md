@@ -13,7 +13,7 @@ description: >
   a research topic. Takes ~10 minutes and consumes a meaningful chunk of
   the user's weekly Claude subscription budget -- the skill always shows a
   cost/time confirmation gate before running.
-version: 0.4.0
+version: 0.5.0
 ---
 
 # Research — paperwik's deep-research skill
@@ -177,10 +177,22 @@ For each sub-question:
 5. Assign each chunk a unique alphanumeric ID (format: `s{section_id}_c{n}`)
 6. Route each chunk to the section(s) its sub-question feeds
 
-Output: `chunks.json` in the run directory. Typical volume: 20-50 searches
-per run; 30-80 chunks in the final filtered set.
+**v0.5.0 / CoWork D2R-2/D2R-3:** searcher subagents emit their output to
+`runs/<run_id>/chunks/searcher_<N>.json` using the **strict canonical 7-key
+schema** documented in `references/search_contract.md` v2 (`chunk_id`,
+`section_id`, `source_url`, `source_title`, `fetched_at`,
+`sub_question_origin`, `text`). After all searchers complete, the parent
+runs `scripts/merge_chunks.py` which normalizes any historical drift
+variants, de-duplicates, sorts, and writes the unified
+`runs/<run_id>/chunks.json` plus a `pending_sections.json`. Even with
+paperwik's default of one searcher subagent the merge step is run for
+schema enforcement consistency. Strict schema + merger pair eliminates
+the "4 searchers produce 4 different shapes" failure CoWork hit on its
+D2 run.
 
-See `references/search_contract.md`.
+Typical volume: 20-50 searches per run; 30-80 chunks in the final filtered set.
+
+See `references/search_contract.md` v2 and `scripts/merge_chunks.py`.
 
 ### Phase 3 — Synthesize (Section Writers, Sonnet, in parallel)
 
@@ -201,8 +213,28 @@ Agent({
 ```
 
 Spawn all sections in ONE message for parallel execution. Paperwik default
-is 3 subagents; max 10 (Claude Code hard cap). Each subagent writes its
-draft to `drafts/<section_id>.md` in the run directory.
+is 3 subagents; max 10 (Claude Code hard cap).
+
+**v0.5.0 / CoWork D2R-4/D2R-5: inline-return is now the default deliverable
+channel.** Each section-writer subagent returns its deliverable INLINE in
+its response inside a four-marker block (`---BEGIN_SECTION---` /
+`---END_SECTION---`, `---BEGIN_SUMMARY---` / `---END_SUMMARY---`,
+`---METADATA---` / `---END_METADATA---` — see `references/section_writer_prompt.md`
+v2). The parent (main session) runs:
+
+```bash
+PAPERWIK_PLUGIN="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/marketplaces/paperwik}"
+uv run "$PAPERWIK_PLUGIN/scripts/parse_section_response.py" \
+    --run-dir <run_dir> --section-id <sid> --response-file <captured_response>
+```
+
+to extract the three blocks and write `drafts/<sid>.md`,
+`drafts/_summaries/<sid>.txt`, and `drafts/_metadata/<sid>.json`. This
+replaces the earlier "subagent calls Write itself" pattern, which CoWork's
+D2 run discovered was silently broken (subagents on some Claude Code
+installations have no file-write permission to the run directory and 9
+of 10 first-attempt agents failed silently). Inline-return works
+regardless of sandbox state.
 
 **Do NOT poll for completion.** The SubagentStop hook
 (`plugin/hooks/subagent_stop.py`) detects draft-file completion via the
@@ -210,31 +242,62 @@ filesystem sentinel pattern (bug #7881 workaround) and writes a
 `ready_to_stitch` sentinel when all drafts are in. Wait for the sentinel
 to exist before proceeding to Phase 4.
 
-See `references/section_writer_prompt.md`.
+See `references/section_writer_prompt.md` v2 and
+`scripts/parse_section_response.py`.
 
 ### Phase 4 — Stitch + Sanitize (Editor, Sonnet)
 
 Once the `ready_to_stitch` sentinel appears:
 
 1. **Concatenate** drafts in outline order into a single document with H2
-   section headers interpolated.
-2. **Run the Sanitizer** (`scripts/sanitizer.py`): for every `[chunk_id]`
-   citation in the text, compare the claim against the source chunk's text
-   via deterministic fuzzy matching. AMBIGUOUS and FAIL cases escalate to
-   LLM-as-judge Task subagents pinned to `model: "haiku"` (lightweight
-   classification). See `references/sanitizer_pattern.md`.
-3. **Contradiction pass** (optional): extract atomic claims across
+   section headers interpolated. (v0.5.0 / CoWork v1.1: this is now done
+   by `scripts/stitch_final.py` which also assembles the YAML frontmatter,
+   Sources table, and Verification appendix — see step 6 below.)
+2. **Run the Sanitizer** (`scripts/sanitizer.py` — Tier 1 only, paperwik's
+   2-tier subset): for every `[chunk_id]` citation in the text, compare
+   the claim against the source chunk's text via deterministic
+   `rapidfuzz.partial_ratio` scoring. PASS / AMBIGUOUS / FAIL verdicts
+   written to `verification_report.json`. **AMBIGUOUS and FAIL escalate
+   to Tier 3 (LLM-as-judge); paperwik does NOT have CoWork's Tier 2
+   (local NLI on NUC) — that tier is NUC-dependent and inapplicable
+   here.** The simpler Tier 1 → Tier 3 cascade is functionally
+   equivalent to CoWork's `DEEP_RESEARCH_ZSC_ENABLED=false` kill-switch
+   state. See `references/sanitizer_pattern.md` and
+   `DIVERGENCES_FROM_COWORK.md`.
+3. **Tier 3 LLM-as-judge for AMBIGUOUS/FAIL** (v0.5.0 / CoWork D2R-1):
+   - Run `uv run "$PAPERWIK_PLUGIN/scripts/tier3_judge.py" prepare --run-dir <run_dir>`
+     to filter the verification report to escalation-needing pairs and
+     write `tier3_input.json`.
+   - Spawn ONE Task subagent with `model: "haiku"` and the prompt from
+     `references/tier3_judge_prompt.md`. Subagent returns verdicts inline
+     in `---BEGIN_VERDICTS---` / `---END_VERDICTS---` markers; parent
+     parses and writes `tier3_verdicts.json`.
+   - Run `uv run "$PAPERWIK_PLUGIN/scripts/tier3_judge.py" merge --run-dir <run_dir>`
+     to fold verdicts into `verification_report_v3.json`.
+4. **Correct FAIL cases**: substitution → weakening → deletion (same
+   algorithm as CoWork). If >5% of claims need deletion, halt the run
+   and report.
+5. **Contradiction pass** (optional): extract atomic claims across
    sections; surface direct contradictions in a dedicated `## Contradictions`
    H2 rather than silently resolving them.
-4. **Generate the filename** via `scripts/slug_from_topic.py` -- produces
-   dad-readable `"Cognitive Health Strategies - 2026-04-24.md"` style.
-5. **Validate output format** via `scripts/output_validator.py`: YAML
-   frontmatter + H2/H3 structure + Sources table presence. Blocks write on
-   any violation.
-6. **Write** the final document to `~/Paperwik/Vault/Inbox/<slug>.md`.
+6. **Stitch the final document** via `scripts/stitch_final.py`. This
+   builds the YAML frontmatter, body (sections in outline order with H2
+   headers), Sources table from `chunks.json`, and Verification appendix
+   from `verification_report_v3.json`. Writes both
+   `runs/<run_id>/final.md` and the dad-readable
+   `~/Paperwik/Vault/Inbox/deep_research_<slug>_<date>.md`.
+   (Filename slug generation is handled internally by `stitch_final.py`;
+   `scripts/slug_from_topic.py` from earlier paperwik versions is still
+   present but no longer the primary slug source.)
+7. **Validate output format** via `scripts/output_validator.py` (v0.5.0:
+   relaxed contract — requires `## Context` first, `## Sources` present,
+   ≥3 other H2 sections in between, any topic-specific names; trailing
+   appendices like `## Verification` are allowed; `## Gaps & Caveats`
+   is RECOMMENDED but not required). Blocks write on any HARD violation
+   (frontmatter shape, missing Context/Sources, citation-without-source-row).
 
-The `ingest` skill (or a user saying "ingest this") will pick it up from
-there.
+The `ingest` skill (or a user saying "ingest this") will pick the final
+document up from `Vault/Inbox/`.
 
 ---
 
@@ -364,3 +427,24 @@ scripts use the `uv run` pattern for consistency.
   wake-lock + slug generator; up-front cost/time gate + one-time advisory;
   explicit `model:` pinning in every Task call; hook registration moved to
   vault-level `settings.local.json` per bug #10412.
+
+- **v0.5.0 (2026-04-27, paperwik adoption of CoWork deep-research v1.1+v1.2)** --
+  Migrated the v1.1 + v1.2 contract clarity and reliability changes from
+  CoWork's `.claude/skills/deep-research/`. New scripts:
+  `scripts/merge_chunks.py` (D2R-2), `scripts/parse_section_response.py`
+  (D2R-5), `scripts/stitch_final.py` (v1.1), `scripts/tier3_judge.py`
+  (v1.1, since paperwik runs Tier 3 LLM-judge). New reference:
+  `references/tier3_judge_prompt.md` (D2R-1). Updated references:
+  `section_writer_prompt.md` v2 (inline-return is the default deliverable
+  channel, replacing the silently-broken file-write contract);
+  `search_contract.md` v2 (strict 7-key canonical chunk schema).
+  Updated `scripts/output_validator.py` (v1.1 relaxed: requires
+  `## Context` first + `## Sources` present + >=3 other H2 between,
+  topic-specific names allowed, trailing appendices like
+  `## Verification` allowed, `## Gaps & Caveats` recommended-not-required).
+  Sanitizer cascade is paperwik's 2-tier subset (Tier 1 rapidfuzz +
+  Tier 3 LLM-judge); CoWork's Tier 2 (NUC-resident DeBERTa-v3 NLI via
+  `verify_nli` MCP tool) is NUC-dependent and skipped — see
+  `DIVERGENCES_FROM_COWORK.md` for the explicit 2-tier vs 3-tier mapping.
+  Functionally equivalent to running CoWork's engine with
+  `DEEP_RESEARCH_ZSC_ENABLED=false`.

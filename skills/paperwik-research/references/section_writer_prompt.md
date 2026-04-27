@@ -17,21 +17,13 @@ filled in.
 Agent({
   description: "Section writer: <section title>",
   subagent_type: "general-purpose",
-  model: "sonnet",
   prompt: <TEMPLATE WITH PLACEHOLDERS FILLED>
 })
 ```
 
-**IMPORTANT (paperwik-specific):** the `model: "sonnet"` parameter is
-MANDATORY in every section-writer Task call. Never omit it. Never rely on
-parent-model inheritance — if the user's main chat is set to Opus (Pro tier
-now exposes Opus 4.7 in the model picker), inheritance would dispatch
-subagents to Opus and burn the user's weekly budget ~3x faster than the
-intended Sonnet routing.
-
 All section subagents are spawned in a single message for parallel execution
-(Claude Code's 10-subagent concurrency cap means 3–12 sections spawn in
-one batch; paperwik default is 3).
+(Claude Code's 10-subagent concurrency cap means 8–12 sections spawn in
+one batch).
 
 ---
 
@@ -80,8 +72,26 @@ state it as a gap: "Available sources do not address whether X."
    establishes (matches the intent above).
 2. Use H3 subheadings (###) freely if it improves readability, but do NOT
    use H2 — that level is reserved for the overall document structure.
-3. Cite every factual claim inline with its chunk ID. A claim that synthesizes
-   multiple sources cites all of them: [s3_c1, s3_c4, s3_c7].
+3. **Citation discipline (revised v1.1, 2026-04-27):** Cite each atomic claim
+   with the SINGLE chunk ID that most directly supports its specific phrasing.
+   Use a multi-citation list (e.g., `[s3_c1, s3_c4]`) ONLY when 2+ chunks each
+   independently support the same atomic claim — not when chunks together
+   contribute background context for adjacent ideas.
+
+   **Good (single-chunk, claim and source align tightly):**
+   > Brave Search costs $5 per 1,000 queries on the basic tier [s3_c1].
+
+   **Bad (multi-citation list where only one chunk supports the specific claim):**
+   > Brave Search costs $5 per 1,000 queries [s3_c1, s3_c4, s3_c7].
+   *(s3_c4 and s3_c7 mention Brave but don't independently establish the price.)*
+
+   **Good (multi-citation when each chunk independently supports the same claim):**
+   > Three independent reviews recommend Brave over Tavily for cost-efficiency
+   > [s3_c1, s3_c4, s3_c7].
+
+   If you find yourself wanting to cite "background" chunks alongside the load-
+   bearing one, write a separate sentence about the background and cite it
+   there. Don't pile citations onto the load-bearing claim.
 4. Prefer concrete numbers, names, and dates over vague language. If the
    sources say "$5 per 1000 queries", say that — not "affordable".
 5. Surface contradictions between sources IN THE TEXT: "Source [s3_c2]
@@ -93,6 +103,15 @@ state it as a gap: "Available sources do not address whether X."
 8. Do NOT speculate beyond what the sources support. Hedging language
    ("may", "is likely", "according to one report") is fine when the
    evidence is thin.
+
+## Output channel — INLINE RETURN (DEFAULT)
+
+You do NOT have file-write permission in your sandbox on this Claude Code
+installation. Do NOT attempt `Write`, `Bash`, `PowerShell`, or any other
+write tool to persist your section — they will be denied. Your deliverable
+is returned INLINE in your response, formatted EXACTLY as the four-marker
+block below. The parent agent (the orchestrator) parses the markers and
+writes the files; you do not.
 
 ## Output format
 
@@ -110,8 +129,9 @@ section is complete.
 - Verify every inline citation ID appears in your chunks list.
 - Verify no inline citation is fabricated.
 
-After writing the section, also produce a SHORT summary (max 2 sentences)
-of the key claims you made. Format the full response as:
+After writing the section, produce a SHORT summary (max 2 sentences) of
+the key claims you made, plus a metadata block. Format the full response
+EXACTLY as the four-marker block:
 
 ---BEGIN_SECTION---
 <the section body markdown>
@@ -120,6 +140,16 @@ of the key claims you made. Format the full response as:
 ---BEGIN_SUMMARY---
 <2-sentence summary of the key claims>
 ---END_SUMMARY---
+
+---METADATA---
+word_count: <integer count of your section body>
+distinct_chunks_cited: <integer count of distinct chunk IDs you used>
+chunk_ids_cited: <comma-separated list of chunk IDs you used>
+---END_METADATA---
+
+No commentary outside those three blocks. The orchestrator will run
+`scripts/parse_section_response.py` against your raw response to extract the
+SECTION, SUMMARY, and METADATA blocks and write the corresponding files.
 ```
 
 ---
@@ -162,11 +192,35 @@ user BEFORE synthesis runs.
 
 ## Output Capture
 
-The main session reads the section writer's response and:
-1. Extracts the `---BEGIN_SECTION---` to `---END_SECTION---` block
-2. Writes it to `.claude/skills/state/deep-research/runs/<run_id>/drafts/<section_id>.md`
-3. Extracts the `---BEGIN_SUMMARY---` to `---END_SUMMARY---` block
-4. Appends it to `drafts/_summaries.json` for the Editor's reference
+The main session reads the section writer's response and runs:
+
+```
+uv run scripts/parse_section_response.py \
+    --run-dir <RUN_DIR> \
+    --section-id <SECTION_ID> \
+    --response-file <path-to-captured-response>
+```
+
+The parser:
+1. Extracts the `---BEGIN_SECTION---` to `---END_SECTION---` block and writes
+   `<RUN_DIR>/drafts/<SECTION_ID>.md`
+2. Extracts the `---BEGIN_SUMMARY---` to `---END_SUMMARY---` block and writes
+   `<RUN_DIR>/drafts/_summaries/<SECTION_ID>.txt`
+3. Extracts the `---METADATA---` block and writes
+   `<RUN_DIR>/drafts/_metadata/<SECTION_ID>.json`
+4. Exits 0 if all three blocks parse cleanly; exits nonzero if any are missing
+   or malformed (orchestrator should re-spawn that section).
+
+## Fallback: file-write contract (DEPRECATED)
+
+> **DEPRECATED as of v2 (2026-04-27, D2R-4).** Preserved here for historical
+> context only. Earlier versions of this prompt directed the section-writer
+> subagent to call `Write` itself to persist `drafts/<section_id>.md` and a
+> `drafts/_summaries.json` entry. D2 (2026-04-27) revealed that subagents on
+> this Claude Code installation have no write permission to the run-dir; 9 of
+> 10 first-attempt agents failed silently because of this. The inline-return
+> path above is the new default and works regardless of sandbox state. Do not
+> rely on the file-write path for new code.
 
 ---
 
@@ -195,6 +249,12 @@ It does NOT spawn a dedicated section-writer subagent for it.
 
 - **v1 (2026-04-22, action item A4)** — Initial template. Citation contract,
   output format, placeholder substitutions, framing-section exception.
-  Ported from CoWork source at 2026-04-24 (action item #408). The only
-  paperwik-specific adaptation is the MANDATORY `model: "sonnet"` directive
-  in the Invocation section — rationale in SKILL.md.
+- **v1.1 (2026-04-27)** — Citation discipline directive #3 tightened to require
+  single chunk per atomic claim with good-vs-bad examples (DR11-7).
+- **v2 (2026-04-27, D2 retrospective, D2R-4)** — Inline-return is the default
+  deliverable channel; file-write path moved to a "Fallback (DEPRECATED)"
+  section. New METADATA block (`word_count`, `distinct_chunks_cited`,
+  `chunk_ids_cited`) joins SECTION + SUMMARY in the response. Output capture
+  now goes through `scripts/parse_section_response.py` rather than the parent
+  hand-extracting blocks. Closes the AGENT_ONBOARDING.md "Pending follow-ups"
+  item from the 2026-04-27 session.

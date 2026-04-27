@@ -28,6 +28,79 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.7.0 -- adopted CoWork's deep-research engine v1.1 + v1.2 changes
+    into paperwik's `paperwik-research` skill.
+
+    Background: paperwik shipped v0.4.0 of the research skill in mid-
+    April as a port of CoWork's deep-research v1. Since then CoWork ran
+    two real research jobs (D1, D2) and shipped v1.1 + v1.2 with
+    contract clarity and reliability fixes that are not specific to
+    the CoWork workspace. Per the paperwik handover document, this
+    release migrates those changes.
+
+    Adopted verbatim from CoWork (8 files):
+      - references/section_writer_prompt.md v2 (inline-return contract,
+        D2R-4: subagent returns deliverable as a four-marker block;
+        the parent runs parse_section_response.py to extract; closes
+        the failure mode where 9/10 first-attempt subagents lost their
+        output to file-write sandbox restrictions)
+      - references/search_contract.md v2 (strict 7-key canonical chunk
+        schema, D2R-3: closes the failure mode where N parallel
+        searcher subagents produced N different shapes for the same
+        logical chunk object)
+      - references/tier3_judge_prompt.md (D2R-1: materializes the
+        Tier 3 LLM-judge prompt template referenced by tier3_judge.py
+        but missing on disk in v1.1)
+      - scripts/merge_chunks.py (D2R-2: normalizes 4 known shape
+        variants of searcher_<N>.json into the canonical chunks.json
+        + pending_sections.json)
+      - scripts/parse_section_response.py (D2R-5: pairs with
+        section_writer_prompt v2 to extract the four-marker blocks
+        and write drafts/<sid>.md, drafts/_summaries/<sid>.txt,
+        drafts/_metadata/<sid>.json)
+      - scripts/stitch_final.py (v1.1: assembles the YAML
+        frontmatter + body + Sources table + verification appendix
+        into final.md and the dad-readable Inbox copy)
+      - scripts/output_validator.py v1.1 (relaxed body-format
+        contract: requires ## Context first, ## Sources present, >=3
+        other H2 in between; topic-specific section names allowed;
+        ## Gaps & Caveats recommended-not-required; trailing
+        ## Verification appendix permitted)
+      - scripts/tier3_judge.py (v1.1: prepare/merge orchestration
+        for the Tier 3 LLM-judge step)
+
+    Adapted (2 files):
+      - skills/paperwik-research/SKILL.md (v0.4.0 -> v0.5.0). Preserves
+        all paperwik-specific bits (Phase 0 cost gate + advisory +
+        wake-lock; hybrid model routing pinning Sonnet vs. Haiku per
+        Task call; default 3 sections; vault-level hook registration).
+        Updates Phase 2/3/4 to reference the new scripts and
+        contracts.
+      - skills/paperwik-research/references/sanitizer_pattern.md
+        (paperwik 2-tier rewrite: documents the Tier 1 + Tier 3
+        cascade explicitly, drops Tier 2 references, points at the
+        new tier3_judge.py orchestration; functionally equivalent to
+        running CoWork's engine with DEEP_RESEARCH_ZSC_ENABLED=false).
+
+    Skipped (1 file):
+      - scripts/tier2_verify.py (NUC-dependent: requires the
+        verify_nli MCP tool served by a DeBERTa-v3 NLI model on a
+        workspace NUC; non-applicable on a friend-and-family
+        Windows install).
+
+    New (1 file):
+      - skills/paperwik-research/DIVERGENCES_FROM_COWORK.md documents
+        9 paperwik-vs-CoWork divergences and the verbatim-adopted
+        file list, so future maintainers can diff and absorb upstream
+        deltas systematically.
+
+    No changes to v0.6.x ZSC routing, v0.6.x classifier path, or any
+    of the v0.6.0-v0.6.8 patches. The paperwik-research skill is
+    independent of project_router.py / classify.py / source_classifier.py
+    and the migration is purely additive.
+
+    Pre-commit parse-tested per memory rule. PARSE OK.
+
     v0.6.8 -- classifier scoring mode fix.
 
     The v0.6.7 template + label tuning made the classifier pick the
