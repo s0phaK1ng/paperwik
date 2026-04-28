@@ -23,18 +23,41 @@ Canonical chunk schema (STRICT — see references/search_contract.md):
       "text": "<~500-token passage of clean text>"
     }
 
-This script accepts the four shape variants D2 saw and normalizes them:
+CoWork's D2 surfaced four empirical input shapes from four parallel searcher
+subagents. The normalizer's actual mechanism is field-by-field optional
+key-rename detection, not four discrete schema branches — so the same logic
+absorbs any subagent that uses one of the recognized rename keys for any of
+the canonical 7. The "four variants" terminology below is descriptive of
+D2's instance, not exhaustive of what the merger can handle.
+
+The known input shapes (from D2):
     1. Native canonical (list of objects with all 7 keys)             - searcher_1
     2. Key renames (`id`->`chunk_id`, `section`->`section_id`,        - searcher_2
        missing fetched_at + sub_question_origin filled with defaults)
-    3. Nested envelope (top-level dict with "chunks" key holding the   - searcher_3
+    3. Nested envelope (top-level dict with "chunks" key holding the  - searcher_3
        list, with `id`/`section`/`url`/`title`/`extract`/`subquestion`
        per chunk)
-    4. Nested envelope with extra metadata (`searcher`, `run_dir`,     - searcher_4
+    4. Nested envelope with extra metadata (`searcher`, `run_dir`,    - searcher_4
        `summary` siblings; per-chunk uses `topic`/`date`/`extract`)
 
-If a chunk doesn't match any known variant, the script fails loudly so the
-orchestrator can re-spawn that searcher rather than silently dropping data.
+The recognized field-rename pairs (any new variant using only these
+renames is normalized automatically):
+    chunk_id  <- id
+    section_id  <- section
+    source_url  <- url
+    source_title  <- title
+    fetched_at  <- date
+    sub_question_origin  <- subquestion | topic
+    text  <- extract
+
+paperwik typical case: paperwik runs ONE searcher subagent (vs CoWork's
+N parallel searchers). The merger still runs for schema-enforcement
+consistency; it normalizes the single searcher_1.json to chunks.json
+the same way a single CoWork searcher would.
+
+If a chunk doesn't match any known variant (uses unknown key names for
+the canonical fields), the script fails loudly so the orchestrator can
+re-spawn that searcher rather than silently dropping data.
 
 Usage:
     uv run scripts/merge_chunks.py --run-dir /path/to/runs/<run_id>

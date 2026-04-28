@@ -1,0 +1,8 @@
+Sure! Here is my section.
+
+---BEGIN_SECTION---
+Coffee extraction is governed by four primary variables: grind size, water temperature, contact time, and ratio [s1_c1]. Espresso uses a fine grind under 9 bar of pressure; pour-over uses medium grind at atmospheric pressure.
+
+Note: I'm omitting the ---END_SECTION--- marker here, and also not providing a SUMMARY or METADATA block. This response is intentionally malformed so the harness can verify that parse_section_response.py rejects it (exit code 1) rather than silently passing.
+
+This file should never reach the orchestrator's drafts/ directory.

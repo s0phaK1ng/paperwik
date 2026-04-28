@@ -1,0 +1,48 @@
+Here is my completed Section 3 (Espresso for the home) for the deep research run.
+
+---BEGIN_SECTION---
+Home espresso splits into four equipment categories by mechanism: capsule machines (Nespresso and similar, 100 to 300 USD), semi-automatic pump machines (most home setups, 600 to 3000 USD), heat-exchanger or dual-boiler prosumer machines (1500 to 5000 USD), and lever machines whether manual or spring lever (600 to 3000 USD) [s3_c1]. Capsule machines are convenient and consistent but produce limited flavor depth; the bean is locked in by the manufacturer and the pressure profile is fixed. Semi-automatic pump machines are where most serious home espresso lives. The four categories are not interchangeable price tiers — they trade off different things, with semi-automatics emphasizing flexibility, prosumers emphasizing temperature stability and steam power, and levers emphasizing tactile control over the pressure profile.
+
+### The grinder matters as much as the machine
+
+The single most consequential decision in a home espresso setup is the grinder, not the machine [s3_c1]. An espresso-specific grinder can cost as much as the machine itself, and below a certain quality threshold no espresso machine can produce a good shot. As of 2026, the entry-level competent home setup is a Breville Bambino Plus at approximately 500 USD paired with a Baratza Encore ESP grinder at approximately 200 USD — total 700 USD [s3_c1]. Below this threshold, the espresso experience consistently disappoints: shots gush or choke unpredictably, dose-to-yield ratios drift between pulls, and the user concludes (incorrectly) that home espresso simply is not as good as cafe espresso. Above 1500 USD, returns diminish quickly until the prosumer category at 3000-plus USD where temperature stability and steam power increase noticeably. The 700-to-1500 USD range is the sweet spot for most home users.
+
+### Three variables drive shot quality
+
+Espresso technique pivots on three variables: dose mass, grind setting, and shot timing [s3_c2]. A typical recipe calls for 18 grams of coffee dosed into a double basket, ground fine enough to yield 36 grams of espresso in 25 to 30 seconds. This 1:2 ratio in 25-30 seconds is the canonical "dialed-in" target. Adjusting any one variable affects the others, which is why home espresso has a steeper learning curve than pour-over [s3_c2]. If the shot pulls too fast (under 25 seconds), the grind is too coarse: tighten by one or two clicks finer. If too slow (over 30 seconds), the grind is too fine: open one or two clicks coarser. If the yield mass is below target at the right time, the dose is too low; if above target, the dose is too high.
+
+### Channeling is the dominant beginner failure mode
+
+The single most common beginner failure in home espresso is channeling [s3_c2]. Channeling is when water finds a path of least resistance through the coffee puck, leaving most of the puck unextracted. It is recognizable visually by the pour: gushing or gout-like spurts during what should be a slow, steady stream. The shot tastes simultaneously sour and weak — under-extracted from the unaffected coffee, plus diluted by the over-flow through the channel. Causes include uneven distribution before tamping, uneven tamping pressure, or a too-coarse grind that creates voids. The fix is technique discipline: distribute the grounds evenly in the basket (using a Weiss distribution tool or a needle distributor), tamp level and firm but not crushing, and check the grind setting if shots channel repeatedly.
+
+### Sour and bitter shots
+
+After channeling, the next two faults to learn to recognize are sour shots and bitter shots [s3_c2]:
+
+- **Sour shots**: under-extracted. Grind too coarse or shot pulled too short. Tighten the grind one or two clicks finer, or extend the shot to 32-36g yield instead of stopping at 30g.
+- **Bitter shots**: over-extracted. Grind too fine or shot pulled too long. Loosen the grind, or stop the shot at 30g instead of letting it run to 40g.
+
+Inconsistent dose-to-yield ratio between shots is the third fault — a sign that the user is dosing by eye rather than by mass. The kitchen scale matters more than expensive equipment, and is non-negotiable for repeatable shots. The same scale a pour-over user buys for 30 USD does double duty.
+
+### What good espresso tastes like
+
+Espresso amplifies the bean's body and sweetness while compressing the acidity and clarity that pour-over emphasizes [s3_c3]. Crema, the foam layer atop a properly-pulled shot, contributes mouthfeel and a slightly bitter edge that masks subtle origin notes. The same Ethiopian Yirgacheffe that tastes of jasmine and lemon in pour-over often presents as sweet and chocolate-toned in espresso. This is not a defect; it is the consequence of higher pressure, higher concentration, and the emulsified oils. Cafes and home brewers selecting beans for espresso often choose darker roasts of the same origin than they would for pour-over, partly to amplify the body and partly because the higher pressure brings out perceived bitterness from lighter roasts that pour-over does not.
+
+### Why milk drinks live with espresso
+
+Espresso pairs more naturally with milk than pour-over, which is why milk-drink culture (cappuccino, latte, flat white) developed around espresso rather than other methods [s3_c3]. The body and sweetness of espresso stand up to steamed milk in a way that pour-over does not — milk dilutes pour-over's clarity into something blander rather than transformed. A household that drinks two or three milk-based drinks per day will find pour-over insufficient and need an espresso machine. A household drinking primarily black coffee will find pour-over more pleasant per dollar.
+
+### When to upgrade espresso equipment
+
+The grinder is again the upgrade with the highest impact-per-dollar [s3_c1]. After the entry-level Encore ESP, the next meaningful jump is to a single-dose grinder like a Niche Zero or DF54 (around 700-900 USD) which eliminates retention between dose adjustments and dramatically reduces the time to dial in a new bag of beans. Machine upgrades in the 1500-2500 USD range buy temperature stability (PID control, dual boilers) and steam power (better milk drinks). Above 3000 USD, the user is paying for build quality and aesthetics rather than measurable cup-quality improvements.
+---END_SECTION---
+
+---BEGIN_SUMMARY---
+A competent home espresso setup starts around 700 USD with a Breville Bambino Plus and Baratza Encore ESP grinder; the grinder is again the highest-impact purchase and channeling is the dominant beginner failure mode. Espresso amplifies body and sweetness while compressing the acidity that pour-over emphasizes, which is why milk-drink culture developed around espresso rather than other brewing methods.
+---END_SUMMARY---
+
+---METADATA---
+word_count: 1085
+distinct_chunks_cited: 3
+chunk_ids_cited: s3_c1, s3_c2, s3_c3
+---END_METADATA---

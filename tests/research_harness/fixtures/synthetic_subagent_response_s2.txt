@@ -1,0 +1,51 @@
+Here is my completed Section 2 (Pour-over for the home) for the deep research run.
+
+---BEGIN_SECTION---
+A complete pour-over setup requires five items: a brewer, filter papers matched to that brewer, a gooseneck kettle with temperature control, a burr grinder, and a kitchen scale that reads to 0.1g [s2_c1]. The canonical brewer choices are the Hario V60, Kalita Wave, and Chemex. Each produces a slightly different cup — V60 emphasizes clarity, Kalita Wave's flat-bottom geometry forgives uneven pours, Chemex's thick filter paper produces the cleanest body of the three — but the differences are subtle compared with the impact of grind size and pour technique. A beginner is well-served picking any of the three and learning it deeply rather than rotating between brewers.
+
+### The grinder is the single most important investment
+
+The grinder is the most consequential purchase in any pour-over setup [s2_c1]. A blade grinder produces uneven grind that no technique can compensate for: the fines over-extract while the boulders under-extract, and the resulting cup tastes simultaneously bitter and sour. The Baratza Encore at approximately 170 USD is the entry-level burr grinder that crosses the threshold of acceptability for pour-over. Below it, every cup is fighting the equipment. Above it, returns diminish until the 400-500 USD range where electric-conical grinders like the Baratza Virtuoso+ or Niche Zero produce noticeably more uniform grind, especially at the medium-fine setting common in pour-over.
+
+### Total entry-level cost
+
+As of 2026, an entry-level pour-over setup totals approximately 180 USD: Hario V60 brewer at 25 USD, Hario filter papers at 8 USD, Fellow Stagg EKG kettle at 165 USD, Baratza Encore burr grinder at 170 USD, and a kitchen scale at 30 USD [s2_c1]. The Stagg EKG kettle is more expensive than strictly necessary — adequate gooseneck kettles with temperature control exist at 80-100 USD — but the EKG's temperature stability and pour-spout geometry are widely considered worth the premium. A budget setup substituting a 90-USD Bonavita kettle would land at 320 USD total. A bare-minimum setup using only a thermometer and a regular kettle would land at around 230 USD but produces meaningfully worse results because pour rate is hard to control without a gooseneck.
+
+### Three technique variables drive most of the outcome
+
+Three technique variables drive 80 percent of pour-over outcome quality: grind size, pour rate, and bloom time [s2_c2]. Grind size is the calibration variable. Too coarse and the brew runs through the bed before extracting properly, producing a sour and weak cup. Too fine and water can not pass through the bed, producing a bitter cup that took five minutes to drip [s2_c2]. The right setting for any specific bean and brewer is found by starting at the manufacturer's medium recommendation and adjusting in quarter-click increments until the total brew time lands in the 3-to-4-minute window. The brew time is the proxy for grind size; once it is in range, finer adjustments are made by taste rather than by clock.
+
+Pour rate should be slow enough to keep the bed evenly saturated but not so slow that channels form in the coffee bed. A useful technique is the four-pour or five-pour pattern: a 30-to-45-gram bloom pour, a 30-to-45-second wait, then three or four equal pours to the target weight. Pouring in concentric circles from the center outward keeps the bed level. Pouring directly down the side of the brewer creates channels that water races down, leaving the central bed under-extracted.
+
+### Bloom time is where beginners under-pour
+
+Bloom time, the 30-to-45 seconds after the initial pour during which carbon dioxide escapes the freshly-ground coffee, is where many home brewers under-pour [s2_c2]. The instinct is to keep pouring; the discipline is to wait. Letting the bloom complete before continuing the pour ensures the rest of the brew water actually contacts coffee rather than chasing CO2 bubbles through the bed. A general guide: pour twice the dose mass in water at the bloom (so 30g of water for 15g of coffee), wait until the visible bubbling subsides, then begin the main pours.
+
+### What good pour-over tastes like
+
+Pour-over emphasizes the bean's origin character [s2_c3]. East African coffees show their floral notes and bright acidity. Central American coffees show their chocolate and nut character. Ethiopian naturals show fruit and acidity that espresso compresses or hides. The lower concentration relative to espresso means subtle flavors are not masked. Skilled tasters describe well-made pour-over as "transparent" — the brewer's choices recede and the bean's character dominates [s2_c3].
+
+### Common beginner faults
+
+Three faults dominate beginner pour-over [s2_c3]:
+
+- **Bitter cup**: over-extracted; grind too fine or pour too slow. Adjust the grinder to one or two clicks coarser and re-evaluate.
+- **Sour cup**: under-extracted; grind too coarse or pour too fast. Adjust to one or two clicks finer and slow the pours.
+- **Muddy cup**: paper filter not pre-rinsed (papery taste contaminating the cup) or channels formed in the bed (uneven extraction). Always pre-rinse the filter with hot water before adding coffee, and aim concentric pours at the bed center, not the brewer wall.
+
+A fourth fault worth flagging: stale beans. Pour-over's transparency means that stale beans (more than 3-4 weeks past roast) taste flat in a way they do not in espresso, where crema and high concentration mask the loss of volatile aromatics. The bean buying habits a pour-over brewer develops therefore differ from those of an espresso drinker — pour-over rewards smaller, more frequent purchases.
+
+### When to upgrade
+
+Beginners often ask when they should upgrade their grinder, kettle, or brewer. The honest answer is that grinder is the only upgrade that meaningfully changes the cup's ceiling. Kettle and brewer upgrades change convenience, not flavor. A brewer who has been using their entry-level setup for six months and still finds the cup unsatisfying after dialing in grind and pour technique should look at the bean (origin, roast date) before the equipment.
+---END_SECTION---
+
+---BEGIN_SUMMARY---
+A competent home pour-over setup costs about 180 USD as of 2026, dominated by the grinder (the most important purchase) and the gooseneck kettle. Outcome quality is driven primarily by three technique variables — grind size, pour rate, and bloom time — and the method emphasizes the bean's origin character at the cost of body, with stale beans showing up much more obviously than they would in espresso.
+---END_SUMMARY---
+
+---METADATA---
+word_count: 1015
+distinct_chunks_cited: 3
+chunk_ids_cited: s2_c1, s2_c2, s2_c3
+---END_METADATA---

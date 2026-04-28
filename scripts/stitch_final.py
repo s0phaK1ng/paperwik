@@ -50,6 +50,15 @@ def main() -> int:
     p.add_argument("--drop-target", required=True, type=Path,
                    help="Directory where the final markdown drops (e.g., Research/_Inbox/)")
     p.add_argument("--research-tool", default="deep-research-skill/v1.1")
+    p.add_argument(
+        "--date",
+        default=None,
+        help=(
+            "Override the document's date (YYYY-MM-DD). Default: today. "
+            "Used by the synthetic test harness to keep snapshots stable "
+            "across days. Production callers should leave this unset."
+        ),
+    )
     args = p.parse_args()
 
     run_dir = args.run_dir
@@ -78,7 +87,7 @@ def main() -> int:
             report_version = cand
             break
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = args.date or datetime.now().strftime("%Y-%m-%d")
     sources_count = len(set(c["source_url"] for c in chunks))
 
     # ---------- YAML frontmatter ----------

@@ -55,7 +55,13 @@ REQUIRED_FRONTMATTER_KEYS = {"topic", "date", "research_tool", "cost", "sources_
 REQUIRED_H2_FIRST = "## Context"
 REQUIRED_H2_LAST = "## Sources"
 RECOMMENDED_H2 = "## Gaps & Caveats"
-MIN_OTHER_H2_SECTIONS = 3  # excluding Context and Sources
+# v0.5.0 (paperwik): MIN_OTHER_H2_SECTIONS lowered from 3 to 2. CoWork's
+# value of 3 was tuned for their 8-12-section default; paperwik's default
+# is 3 outline sections (Context + 2 topical + Sources at minimum), which
+# would conflict with a >=3-intermediate requirement. The synthetic test
+# harness at plugin/tests/research_harness/ surfaced this on first run.
+# See plugin/skills/paperwik-research/DIVERGENCES_FROM_COWORK.md item 10.
+MIN_OTHER_H2_SECTIONS = 2  # excluding Context and Sources
 CITATION_RE = re.compile(r"\[((?:s\d+_c\d+)(?:\s*,\s*s\d+_c\d+)*)\]")
 # Sources table row: | s1_c1 | https://... | Title | 2026-... |
 SOURCES_ROW_RE = re.compile(

@@ -48,10 +48,14 @@ fences, no explanation — just the JSON object:
   question — not a topic heading, not an abstract. Example of good:
   *"What is the default timeout in milliseconds for Claude Code's PreToolUse hook
   in version 2.x?"* Example of bad: *"Claude Code hook system"*.
-- **Sections:** minimum 6, maximum 12. Each section gets its own parallel synthesis
-  subagent later, and the total word count divides across sections — so fewer
-  sections = longer per-section drafts (up to ~800 words) and more sections = shorter
-  (down to ~400 words). Default to 8–10 for a balanced document.
+- **Sections:** minimum 3, maximum 6 (paperwik default). Each section gets its
+  own parallel synthesis subagent later, and the total word count divides
+  across sections — so fewer sections = longer per-section drafts (up to
+  ~1200 words) and more sections = shorter (down to ~600 words). Default
+  to 3 for paperwik (per SKILL.md design principle #4: 3 subagents fit
+  comfortably inside a single Pro 5-hour prompt window). Raise to 4–6 only
+  when the user explicitly asks for a longer document or the topic
+  genuinely demands more decomposition.
 - **Source routing hints:** every section must list AT LEAST ONE sub-question that
   feeds it. A sub-question can feed more than one section. Every sub-question
   should appear in at least one section's routing hints, or the planner is wasting
@@ -60,21 +64,34 @@ fences, no explanation — just the JSON object:
 - **`expected_output_words`** is the target for the final document after stitching.
   Default to 5000. Raise to 6000–8000 only if the topic is genuinely unusually broad.
 
-### Mandatory sections
+### Mandatory + recommended sections (v0.5.0)
 
-Every plan must include these sections (the titles may be adapted for voice, but
-the intent must match):
+Every plan must include:
 
-- **Context** — why this question, what triggered it, what decision it informs
-- **Findings** — the substantive body (may span multiple sections in the outline;
-  the planner decides how to split)
-- **Gaps & Caveats** — what the research could not resolve, single-source claims,
-  areas of ambiguity
+- **Context** (mandatory, the first section): why this question, what triggered
+  it, what decision it informs. The output validator REQUIRES `## Context` to be
+  the first H2 in the body; sections produced by the writers carry topic-specific
+  titles, not "Findings".
 
-**Contradictions** section is conditional: include it ONLY if the planner anticipates
-that sources may conflict (most technical or policy topics will; pure factual
-compilations often won't). The Sanitizer adds or removes this section based on
-what the actual synthesis surfaces.
+The planner's outline does NOT need to include `## Sources` — the Editor
+generates that section from `chunks.json` during stitching. Likewise, the
+planner does NOT include a `## Verification` appendix; that is also generated
+by the Editor from the verification report.
+
+The planner SHOULD include either `## Gaps & Caveats` or an equivalent
+synthesis section (recommended, not mandatory; the v1.1 validator emits a
+WARNING but not an ERROR if absent).
+
+**Contradictions** section is conditional: include it ONLY if the planner
+anticipates that sources may conflict (most technical or policy topics will;
+pure factual compilations often won't). The Sanitizer adds or removes this
+section based on what the actual synthesis surfaces.
+
+Note (paperwik divergence): CoWork's planner_prompt.md required `## Findings`
+explicitly; paperwik's v1.1 validator (per CoWork v1.1 D2R-3 relaxation)
+allows topic-specific section names, so "Findings" is no longer required —
+the topical sections can be named for the topic (e.g., "Pour-over for the
+home", "Espresso for the home").
 
 ---
 

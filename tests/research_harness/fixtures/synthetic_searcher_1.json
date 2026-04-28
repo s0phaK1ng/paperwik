@@ -1,0 +1,92 @@
+[
+  {
+    "chunk_id": "s1_c1",
+    "section_id": "s1",
+    "source_url": "https://example.com/coffee-extraction-101",
+    "source_title": "Coffee Extraction 101: A Brewing-Science Primer",
+    "fetched_at": "2026-04-27T19:00:00Z",
+    "sub_question_origin": "What are the fundamental differences between pour-over and espresso extraction?",
+    "text": "Coffee extraction is governed by four primary variables: grind size, water temperature, contact time, and water-to-coffee ratio. Espresso uses a fine grind, water near 93 C, contact time of 25-30 seconds under 9 bar of pressure, and a 1:2 ratio of dose to yield by mass. Pour-over uses a medium grind, water at 92-96 C, contact time of 3-4 minutes at atmospheric pressure, and a 1:15 to 1:17 ratio. The pressure difference is the primary driver of differing flavor profiles: espresso's high pressure dissolves CO2 and emulsifies oils, producing crema and a heavier body; pour-over's slow infusion produces a clearer cup with more pronounced acidity. Total dissolved solids in a typical espresso shot range from 7-12 percent; pour-over typically extracts 1.2-1.5 percent."
+  },
+  {
+    "chunk_id": "s1_c2",
+    "section_id": "s1",
+    "source_url": "https://example.com/coffee-extraction-101",
+    "source_title": "Coffee Extraction 101: A Brewing-Science Primer",
+    "fetched_at": "2026-04-27T19:00:00Z",
+    "sub_question_origin": "What are the fundamental differences between pour-over and espresso extraction?",
+    "text": "The Specialty Coffee Association's 2024 Brewing Standards define optimal extraction as 18-22 percent of the dry coffee dissolving into the brew. Both pour-over and espresso target this range when dialed in correctly; the difference is concentration, not extraction yield. A common beginner error is conflating concentration with strength: an under-extracted espresso pulled too short tastes sour and weak despite its high TDS, while a properly extracted pour-over can taste robust at much lower TDS. Charles Babinski's 2015 World Brewers Cup-winning recipe demonstrated that disciplined technique on simple equipment can outperform expensive machines used carelessly."
+  },
+  {
+    "chunk_id": "s1_c3",
+    "section_id": "s1",
+    "source_url": "https://example.com/home-coffee-decision-framework",
+    "source_title": "Choosing Between Pour-over and Espresso for Home Use",
+    "fetched_at": "2026-04-27T19:05:00Z",
+    "sub_question_origin": "Why would a home brewer choose one method over the other?",
+    "text": "The home-brewer decision usually comes down to three factors: time per cup, total budget, and preferred flavor profile. Pour-over takes 4-6 minutes per cup including kettle heat-up; espresso takes 1-2 minutes per shot once the machine is at temperature, but the machine itself takes 15-25 minutes to warm up from cold. Pour-over budget can start under 100 USD for entry-level equipment; quality home espresso starts around 600 USD and scales rapidly upward. Flavor: pour-over emphasizes origin character, acidity, and clarity; espresso emphasizes body, sweetness, and milk-drink versatility. Households that drink milk-based drinks daily generally land on espresso despite the higher cost; black-coffee single-cup drinkers usually prefer pour-over."
+  },
+  {
+    "chunk_id": "s1_c4",
+    "section_id": "s1",
+    "source_url": "https://example.com/coffee-extraction-101",
+    "source_title": "Coffee Extraction 101: A Brewing-Science Primer",
+    "fetched_at": "2026-04-27T19:00:00Z",
+    "sub_question_origin": "What are the fundamental differences between pour-over and espresso extraction?",
+    "text": "Both methods are equally capable of producing excellent coffee from the same beans; neither is inherently superior. The choice is about which set of variables the brewer wants to learn to manage and which flavor profile fits their drinking habits. The pour-over learning curve front-loads grind setting and pour technique; the espresso learning curve front-loads grind setting, dose mass, and tamp pressure. Both reward repeatable measurement: a kitchen scale and timer matter more than expensive equipment in either method's first 6 months."
+  },
+  {
+    "chunk_id": "s2_c1",
+    "section_id": "s2",
+    "source_url": "https://example.com/pour-over-equipment-guide",
+    "source_title": "Pour-over Equipment for the Home Brewer",
+    "fetched_at": "2026-04-27T19:10:00Z",
+    "sub_question_origin": "What equipment is needed for high-quality pour-over at home?",
+    "text": "A complete pour-over setup requires five items: a brewer (Hario V60, Kalita Wave, or Chemex are the canonical three), filter papers matched to that brewer, a gooseneck kettle with temperature control, a burr grinder, and a kitchen scale that reads to 0.1g. Total entry-level cost: approximately 180 USD as of 2026 (Hario V60 at 25 USD, Hario filters at 8 USD, Fellow Stagg EKG kettle at 165 USD, Baratza Encore burr grinder at 170 USD, kitchen scale at 30 USD). The grinder is the single most important investment; a blade grinder produces uneven grind that no technique can compensate for."
+  },
+  {
+    "chunk_id": "s2_c2",
+    "section_id": "s2",
+    "source_url": "https://example.com/pour-over-equipment-guide",
+    "source_title": "Pour-over Equipment for the Home Brewer",
+    "fetched_at": "2026-04-27T19:10:00Z",
+    "sub_question_origin": "What technique variables matter most for pour-over?",
+    "text": "Three technique variables drive 80 percent of pour-over outcome quality: grind size, pour rate, and bloom time. Grind too coarse and the brew runs through before extracting; too fine and water can not pass through the bed. The right setting for any specific bean and brewer is a calibration exercise — start at the manufacturer's medium recommendation and adjust by quarter-clicks until the total brew time lands in the 3-4 minute window. Pour rate should be slow enough to keep the bed evenly saturated but not so slow that channels form. Bloom time, the 30-45 seconds after the initial pour during which CO2 escapes the freshly-ground coffee, is where many home brewers under-pour."
+  },
+  {
+    "chunk_id": "s2_c3",
+    "section_id": "s2",
+    "source_url": "https://example.com/pour-over-flavor-deep-dive",
+    "source_title": "Tasting Pour-over: What to Notice",
+    "fetched_at": "2026-04-27T19:15:00Z",
+    "sub_question_origin": "How do flavor profiles differ between the two methods?",
+    "text": "Pour-over emphasizes the bean's origin character: floral notes from East African coffees, chocolate and nut notes from Central American coffees, fruit and acidity from Ethiopian naturals. The lower concentration relative to espresso means subtle flavors are not masked. Skilled tasters describe well-made pour-over as 'transparent' — the brewer's choices recede and the bean's character dominates. Common beginner faults: bitter (over-extracted, grind too fine or pour too slow); sour (under-extracted, grind too coarse or pour too fast); muddy (paper filter not pre-rinsed, channels in the bed)."
+  },
+  {
+    "chunk_id": "s3_c1",
+    "section_id": "s3",
+    "source_url": "https://example.com/home-espresso-buyers-guide",
+    "source_title": "A 2026 Home Espresso Buyer's Guide",
+    "fetched_at": "2026-04-27T19:20:00Z",
+    "sub_question_origin": "What equipment is needed for high-quality espresso at home?",
+    "text": "Home espresso splits into four categories by mechanism: capsule machines (Nespresso, 100-300 USD), semi-automatic pump machines (most home setups, 600-3000 USD), heat-exchanger or dual-boiler prosumer machines (1500-5000 USD), and lever machines (manual or spring lever, 600-3000 USD). The single most consequential decision is the grinder: an espresso-specific grinder can cost as much as the machine itself. As of 2026, the entry-level competent home setup is a Breville Bambino Plus at 500 USD paired with a Baratza Encore ESP grinder at 200 USD — total 700 USD. Below this threshold, the espresso experience consistently disappoints. Above 1500 USD, returns diminish quickly until the prosumer category at 3000+ USD where temperature stability and steam power increase noticeably."
+  },
+  {
+    "chunk_id": "s3_c2",
+    "section_id": "s3",
+    "source_url": "https://example.com/home-espresso-buyers-guide",
+    "source_title": "A 2026 Home Espresso Buyer's Guide",
+    "fetched_at": "2026-04-27T19:20:00Z",
+    "sub_question_origin": "What technique variables matter most for espresso?",
+    "text": "Espresso technique pivots on three variables: dose mass, grind setting, and shot timing. A typical recipe calls for 18g of coffee dosed into a double basket, ground fine enough to yield 36g of espresso in 25-30 seconds. Adjusting any one variable affects the others; this is why home espresso has a steeper learning curve than pour-over. Common beginner faults: channeling (water finds a path through the puck, leaving most coffee unextracted, recognizable by gushing or gout-like spurts during the pour); sour shots (under-extracted, grind too coarse or shot pulled too short); bitter shots (over-extracted, grind too fine or shot pulled too long); inconsistent dose-to-yield ratio (the scale matters more than expensive equipment)."
+  },
+  {
+    "chunk_id": "s3_c3",
+    "section_id": "s3",
+    "source_url": "https://example.com/pour-over-flavor-deep-dive",
+    "source_title": "Tasting Pour-over: What to Notice",
+    "fetched_at": "2026-04-27T19:15:00Z",
+    "sub_question_origin": "How do flavor profiles differ between the two methods?",
+    "text": "Espresso amplifies the bean's body and sweetness while compressing the acidity and clarity that pour-over emphasizes. Crema, the foam layer atop a properly-pulled shot, contributes mouthfeel and a slightly bitter edge that masks subtle origin notes. The same Ethiopian Yirgacheffe that tastes of jasmine and lemon in pour-over often presents as sweet and chocolate-toned in espresso. This is not a defect — it is the consequence of higher pressure, higher concentration, and the emulsified oils. Espresso pairs more naturally with milk than pour-over, which is why milk-drink culture (cappuccino, latte, flat white) developed around espresso rather than other methods."
+  }
+]

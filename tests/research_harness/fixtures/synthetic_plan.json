@@ -1,0 +1,32 @@
+{
+  "topic": "Pour-over vs espresso: home coffee brewing methods compared",
+  "sub_questions": [
+    "What are the fundamental differences between pour-over and espresso extraction?",
+    "What equipment is needed for high-quality pour-over at home?",
+    "What equipment is needed for high-quality espresso at home?",
+    "How do flavor profiles differ between the two methods?",
+    "What is the typical budget range for a complete home setup of each method?",
+    "What are the key technique variables a home brewer should learn first?"
+  ],
+  "section_outline": [
+    {
+      "section_id": "s1",
+      "title": "Context",
+      "intent": "Frame the comparison: extraction principles common to both methods, why home brewers might choose one over the other, what claims this document does and does not address.",
+      "source_routing_hints": "Sub-questions about extraction fundamentals, brewing science, framing"
+    },
+    {
+      "section_id": "s2",
+      "title": "Pour-over for the home",
+      "intent": "Equipment classes, technique fundamentals, flavor profile, typical cost range, common beginner mistakes.",
+      "source_routing_hints": "Sub-questions specific to pour-over equipment, technique, flavor"
+    },
+    {
+      "section_id": "s3",
+      "title": "Espresso for the home",
+      "intent": "Equipment classes (semi-auto / pump / lever / capsule), technique fundamentals, flavor profile, typical cost range, common beginner mistakes.",
+      "source_routing_hints": "Sub-questions specific to espresso equipment, technique, flavor"
+    }
+  ],
+  "expected_output_words": 3500
+}
