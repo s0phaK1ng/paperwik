@@ -12,8 +12,8 @@
   "framing_sections_full_corpus": [],
   "sections_chunk_count": {
     "s1": 4,
-    "s2": 3,
-    "s3": 3
+    "s2": 4,
+    "s3": 4
   },
-  "total_chunks": 10
+  "total_chunks": 12
 }

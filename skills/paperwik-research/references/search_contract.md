@@ -59,8 +59,24 @@ Per-key requirements:
 - **`fetched_at`**: ISO-8601 UTC timestamp. Approximate-now is fine.
 - **`sub_question_origin`**: The sub-question text from `plan.json` that drove
   this fetch. `"(not recorded)"` is acceptable as a fallback but discouraged.
-- **`text`**: The chunk body. ~500 tokens preferred but the chunker decides.
-  Must not be empty.
+- **`text`**: The chunk body. ~500 tokens preferred. **HARD MINIMUM: 200
+  characters.** v0.7.1 update: shorter than 200 chars = content-extraction
+  failure, not a chunk. The merger (`scripts/merge_chunks.py`) rejects
+  short-text chunks with a `ValueError` and the searcher must re-fetch
+  the URL or use a different selector. v0.7.0's D1 sandbox surfaced this:
+  the Haiku searcher emitted ~90-char one-liner "summaries" instead of
+  full passages, the section writers couldn't synthesize from such thin
+  context, and the parent agent had to redo Phase 2 from its own
+  context. F3+F4 in v0.7.1 closes this loophole at both the contract
+  layer (this directive) and the merge layer (validation in
+  `merge_chunks.py`).
+
+  **The searcher MUST invoke `scripts/chunk_text.py` on the fetched
+  markdown** rather than hand-writing summary one-liners. The chunker is
+  what produces ~500-token passages; the searcher's job is to fetch and
+  route, not to summarize. Hand-written one-liners are a contract
+  violation regardless of length, but the 200-char hard floor catches
+  the most common manifestation.
 
 The companion `sources.json` (deduplicated metadata) is OPTIONAL — the
 Sources table in the final document can be reconstructed from `chunks.json`

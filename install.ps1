@@ -28,6 +28,81 @@
     in the terminal-hosted CLI.
 
 .NOTES
+    v0.7.1 -- D1 retrospective fixes (F1-F6). v0.7.0's first real research
+    run on "LiFePO4 vs Li-ion EV battery chemistry tradeoffs" (D1,
+    2026-04-27) ran end-to-end successfully but exposed 6 contract-layer
+    surfaces. v0.7.1 ships all six fixes as one release.
+
+    Captured in plugin/skills/paperwik-research/DIVERGENCES_FROM_COWORK.md
+    item #12 + the v0.7.x_d1_retrospective.md project-root file (which
+    will be archived once Phase 6 confirms field-stable).
+
+    F1 -- settings.json safety-rail refinement. The pre-v0.7.1 deny list
+    contained Write(C:/**) and Edit(C:/**) which blocked ALL absolute
+    Windows-path writes, including legitimate writes inside ~/Paperwik.
+    Matt hit ~6-10 permission prompts during D1's deep-research run on
+    paths under ~/Paperwik/.claude/skills/state/deep-research/runs/...
+    Replaced the broad C:/ deny with surgical denies for Windows system
+    dirs (C:/Windows/, C:/Program Files/, C:/Program Files (x86)/,
+    C:/ProgramData/) plus belt-and-suspenders explicit allows for
+    .claude/skills/state/** paths. Known limitation: non-system-dir
+    absolute writes outside ~/Paperwik are no longer blocked
+    (theoretical prompt-injection vector, revisit in v0.8.x if needed).
+
+    F2 -- planner_prompt.md exact-title requirement for Context and
+    Gaps & Caveats. v0.7.0's planner emitted "Context: Why This
+    Comparison Matters" and "Gaps, Caveats, and Open Questions" — the
+    validator's exact-string match against ## Context and ## Gaps &
+    Caveats failed. Matt's agent had to rewrite plan.json mid-run.
+    v0.7.1 explicitly forbids subtitles/expansions on those two
+    structural section titles. Topical sections retain free-form names.
+
+    F3 + F4 -- searcher chunk-size enforcement. v0.7.0's Haiku searcher
+    emitted ~90-char one-liner "summaries" instead of ~500-token chunks;
+    section writers couldn't synthesize. F3 strengthens
+    references/search_contract.md with a hard 200-char minimum on chunk
+    text and explicit "MUST invoke chunk_text.py" directive. F4 makes
+    scripts/merge_chunks.py raise ValueError on chunks under 200 chars
+    (defense in depth at the merge layer).
+
+    F5 -- planner section-count hard cap at 5. v0.7.0's planner emitted
+    8 sections for the LiFePO4 topic, ~3x the Pro 5-hour-window budget.
+    The pre-v0.7.1 prompt said "default 3, max 6"; v0.7.1 lowers max to
+    5 with explicit "budget constraint, not advisory" framing.
+
+    F6 -- stitch_final.py filters Sources table + sources_count to only
+    chunks actually cited in the body. Pre-v0.7.1 the table listed
+    every chunk in chunks.json regardless of citation; the validator
+    warned about unused IDs but the warning was just noise. v0.7.1
+    uses a regex over the assembled body to identify cited chunk_ids
+    and filters BOTH the Sources table AND the YAML frontmatter
+    sources_count to match.
+
+    Synthetic test harness updated:
+      - Added uncited chunks (s2_c4, s3_c4) to synthetic_searcher_1.json
+        so F6's filter is visibly exercised by the regression baseline
+      - Refreshed expected/chunks.json + expected/pending_sections.json
+        snapshots to reflect the 12-chunk fixture (was 10)
+      - expected/final.md is byte-identical pre/post-v0.7.1 because the
+        2 added chunks are filtered out by F6 and the cited-URL count
+        is unchanged
+      - All 13 snapshot files match after refresh; harness PASSES
+
+    No new Anthropic API dependency. No change to route_content() or
+    classify() signatures (per v0.6.0 D3, D4 -- stable contracts).
+    No change to v0.6.x ZSC routing or classifier path.
+
+    Pre-commit: install.ps1 [ScriptBlock]::Create parse-test PASSED;
+    py_compile on merge_chunks.py + stitch_final.py PASSED; full
+    synthetic harness regression PASSED.
+
+    Phase E (sandbox confirmation) is the next step. Matt runs a
+    research request on "best home espresso machines under $1000" and
+    verifies: (a) zero permission prompts on .claude/skills/state/**;
+    (b) planner emits <=5 sections; (c) section titles are EXACTLY
+    ## Context and (if present) ## Gaps & Caveats; (d) searcher emits
+    chunks >=200 chars; (e) Sources table contains only cited IDs.
+
     v0.7.0 -- adopted CoWork's deep-research engine v1.1 + v1.2 changes
     into paperwik's `paperwik-research` skill.
 

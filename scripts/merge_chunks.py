@@ -138,6 +138,23 @@ def normalize_chunk(c: dict, source_searcher: str) -> dict:
             f"raw keys={sorted(c.keys())}"
         )
 
+    # v0.7.1: hard minimum 200 characters on text. Anything shorter is a
+    # content-extraction failure, not a real chunk. v0.7.0's D1 surfaced
+    # this when the Haiku searcher emitted ~90-char one-liner summaries
+    # instead of ~500-token passages, and section writers couldn't
+    # synthesize from them. The contract directive in
+    # references/search_contract.md tells the searcher to invoke
+    # chunk_text.py rather than hand-writing summaries; this validation
+    # is the merge-layer enforcement of the same rule.
+    if len(text) < 200:
+        raise ValueError(
+            f"chunk {chunk_id} in {source_searcher} has text only "
+            f"{len(text)} chars; minimum is 200 (chunks under that are "
+            f"content-extraction failures, not real chunks). The searcher "
+            f"should invoke scripts/chunk_text.py on the fetched markdown "
+            f"rather than hand-writing summary one-liners."
+        )
+
     return {
         "chunk_id": chunk_id,
         "section_id": section_id,

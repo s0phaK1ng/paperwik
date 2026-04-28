@@ -227,6 +227,47 @@ synthetic test harness.
 
 ---
 
+## 12. settings.json safety rail — paperwik uses surgical Windows-system-dir denies, not broad `Write(C:/**)`
+
+CoWork's deep-research engine doesn't ship a vault-level `settings.json`
+(it uses workspace-level Claude Code configuration). paperwik's
+`templates/paperwik/.claude/settings.json` originally had a broad
+`Write(C:/**)` and `Edit(C:/**)` deny in its safety rail — intent: "block
+the agent from writing anywhere on the Windows system drive."
+
+v0.7.0's first real research run (D1, 2026-04-27) surfaced that the broad
+deny was triggering permission prompts (in bypassPermissions mode) on every
+write inside `~/Paperwik/.claude/skills/state/deep-research/runs/...` —
+which are absolute paths starting with `C:/Users/<user>/Paperwik/...` and
+therefore matched `Write(C:/**)`. The deep-research skill writes its run
+state under that path, so Matt hit ~6-10 permission prompts during a
+single research run.
+
+v0.7.1 replaces the broad deny with surgical denies for Windows system
+directories specifically:
+
+- `Write/Edit(C:/Windows/**)`
+- `Write/Edit(C:/Program Files/**)`
+- `Write/Edit(C:/Program Files (x86)/**)`
+- `Write/Edit(C:/ProgramData/**)`
+
+Plus belt-and-suspenders explicit allows for `.claude/skills/state/**`
+paths. (Note: under Claude Code's current permission semantics, the
+explicit allows are documentation/future-proofing — F1a's deny refactor
+does the actual behavior fix.)
+
+**Known limitation** introduced by this divergence: non-system-dir
+absolute writes outside `~/Paperwik` (e.g., `C:/Users/<other-user>/`,
+`C:/Users/<user>/Desktop/`) are no longer blocked by the safety rail.
+paperwik's normal operation never targets such paths, but a
+prompt-injection attack could. Theoretical risk; revisit in v0.8.x if
+needed.
+
+**Files affected:** `templates/paperwik/.claude/settings.json` (deny
+list refactor + allow list extension).
+
+---
+
 ## What paperwik adopted VERBATIM from CoWork v1.1+v1.2
 
 These files are byte-identical between the CoWork source and paperwik's

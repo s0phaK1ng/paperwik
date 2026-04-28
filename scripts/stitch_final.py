@@ -88,20 +88,8 @@ def main() -> int:
             break
 
     today = args.date or datetime.now().strftime("%Y-%m-%d")
-    sources_count = len(set(c["source_url"] for c in chunks))
 
-    # ---------- YAML frontmatter ----------
-    frontmatter = (
-        "---\n"
-        f'topic: "{plan["topic"]}"\n'
-        f'date: "{today}"\n'
-        f'research_tool: "{args.research_tool}"\n'
-        "cost: null\n"
-        f"sources_count: {sources_count}\n"
-        "---\n\n"
-    )
-
-    # ---------- Body ----------
+    # ---------- Body (assembled before frontmatter so we can extract citations) ----------
     sections_by_id = {s["section_id"]: s for s in plan["section_outline"]}
     body_parts = []
 
@@ -121,10 +109,43 @@ def main() -> int:
 
     body_text = "\n".join(body_parts)
 
-    # ---------- Sources table ----------
+    # ---------- v0.7.1 (F6): determine which chunks the body actually cites ----------
+    # Pre-v0.7.1 the Sources table listed every chunk in chunks.json
+    # regardless of whether any section writer cited it. The validator
+    # warned about unused IDs but didn't fail; users saw a Sources table
+    # with dangling references. v0.7.1 uses a regex over the assembled
+    # body to find cited chunk_ids and filters BOTH the Sources table
+    # AND the YAML frontmatter's sources_count to reflect only cited
+    # sources.
+    cited_ids: set[str] = set()
+    citation_re = re.compile(r"\[((?:s\d+_c\d+)(?:\s*,\s*s\d+_c\d+)*)\]")
+    for m in citation_re.finditer(body_text):
+        for cid in m.group(1).split(","):
+            cited_ids.add(cid.strip())
+
+    # sources_count = unique URLs across CITED chunks only (F6-consistent)
+    sources_count = len({
+        c["source_url"] for c in chunks if c["chunk_id"] in cited_ids
+    })
+
+    # ---------- YAML frontmatter (now uses cited-chunk source count) ----------
+    frontmatter = (
+        "---\n"
+        f'topic: "{plan["topic"]}"\n'
+        f'date: "{today}"\n'
+        f'research_tool: "{args.research_tool}"\n'
+        "cost: null\n"
+        f"sources_count: {sources_count}\n"
+        "---\n\n"
+    )
+
+    # ---------- Sources table (v0.7.1: filter to cited chunks only) ----------
+
     sources_seen = OrderedDict()
     for c in chunks:
         cid = c["chunk_id"]
+        if cid not in cited_ids:
+            continue  # F6: skip chunks no section writer cited
         if cid not in sources_seen:
             title_clean = c.get("source_title", "")[:60].replace("|", "\\|")
             sources_seen[cid] = {

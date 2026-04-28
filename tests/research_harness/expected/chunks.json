@@ -63,6 +63,15 @@
     "text": "Pour-over emphasizes the bean's origin character: floral notes from East African coffees, chocolate and nut notes from Central American coffees, fruit and acidity from Ethiopian naturals. The lower concentration relative to espresso means subtle flavors are not masked. Skilled tasters describe well-made pour-over as 'transparent' — the brewer's choices recede and the bean's character dominates. Common beginner faults: bitter (over-extracted, grind too fine or pour too slow); sour (under-extracted, grind too coarse or pour too fast); muddy (paper filter not pre-rinsed, channels in the bed)."
   },
   {
+    "chunk_id": "s2_c4",
+    "section_id": "s2",
+    "source_url": "https://example.com/coffee-water-chemistry",
+    "source_title": "Water Chemistry for Specialty Coffee",
+    "fetched_at": "2026-04-27T19:30:00Z",
+    "sub_question_origin": "Does water chemistry matter for pour-over?",
+    "text": "Water chemistry has a measurable impact on pour-over extraction quality. The Specialty Coffee Association recommends 150 ppm total dissolved solids, with calcium and magnesium hardness in the 50-175 ppm range and alkalinity around 40 ppm. Distilled water under-extracts because there are no minerals to bond with the soluble compounds in the grounds; very hard water over-extracts and tastes chalky. Most municipal water in major US cities falls within an acceptable range; brewers in soft-water regions sometimes use Third Wave Water sachets to remineralize. This chunk is a v0.7.1 harness fixture for F6 testing — included in chunks.json but NOT cited by any section response, so the F6 Sources-table filter must drop it from the final document's Sources table."
+  },
+  {
     "chunk_id": "s3_c1",
     "section_id": "s3",
     "source_url": "https://example.com/home-espresso-buyers-guide",
@@ -88,5 +97,14 @@
     "fetched_at": "2026-04-27T19:15:00Z",
     "sub_question_origin": "How do flavor profiles differ between the two methods?",
     "text": "Espresso amplifies the bean's body and sweetness while compressing the acidity and clarity that pour-over emphasizes. Crema, the foam layer atop a properly-pulled shot, contributes mouthfeel and a slightly bitter edge that masks subtle origin notes. The same Ethiopian Yirgacheffe that tastes of jasmine and lemon in pour-over often presents as sweet and chocolate-toned in espresso. This is not a defect — it is the consequence of higher pressure, higher concentration, and the emulsified oils. Espresso pairs more naturally with milk than pour-over, which is why milk-drink culture (cappuccino, latte, flat white) developed around espresso rather than other methods."
+  },
+  {
+    "chunk_id": "s3_c4",
+    "section_id": "s3",
+    "source_url": "https://example.com/espresso-machine-maintenance",
+    "source_title": "Espresso Machine Maintenance Cadence",
+    "fetched_at": "2026-04-27T19:35:00Z",
+    "sub_question_origin": "What maintenance does a home espresso machine need?",
+    "text": "Home espresso machines require regular maintenance that pour-over setups don't: weekly back-flushing with detergent (Cafiza powder dissolved in water), monthly group-head gasket inspection, quarterly descaling if the local water is hard, annual replacement of group-head gaskets and shower screens. Skipping back-flush leads to rancid coffee oils accumulating in the brew path and tainting every shot's flavor. The maintenance overhead is modest — about 5-10 minutes per week — but it is real and ongoing. This chunk is a v0.7.1 harness fixture for F6 testing — included in chunks.json but NOT cited by any section response, so the F6 Sources-table filter must drop it from the final document's Sources table."
   }
 ]

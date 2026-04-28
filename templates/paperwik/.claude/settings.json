@@ -18,11 +18,20 @@
       "Agent(*)",
       "WebFetch",
       "WebSearch",
-      "Bash(*)"
+      "Bash(*)",
+      "Write(.claude/skills/state/**)",
+      "Edit(.claude/skills/state/**)",
+      "Read(.claude/skills/state/**)"
     ],
     "deny": [
-      "Write(C:/**)",
-      "Edit(C:/**)",
+      "Write(C:/Windows/**)",
+      "Edit(C:/Windows/**)",
+      "Write(C:/Program Files/**)",
+      "Edit(C:/Program Files/**)",
+      "Write(C:/Program Files (x86)/**)",
+      "Edit(C:/Program Files (x86)/**)",
+      "Write(C:/ProgramData/**)",
+      "Edit(C:/ProgramData/**)",
       "Write(.obsidian/**)",
       "Edit(.obsidian/**)",
       "Write(.git/**)",
