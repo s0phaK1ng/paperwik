@@ -1,6 +1,6 @@
 {
   "name": "pw",
-  "description": "Paperwik — agent-maintained Obsidian knowledge base. The LLM reads your sources, writes summary pages, maintains cross-references, and builds a persistent wiki that compounds over time. Slash commands are prefixed with /pw: for brevity. Marketplace + brand remain 'paperwik'; only the plugin identifier is short.",
+  "description": "Paperwik — agent-maintained Obsidian knowledge base with tooling-enforced contracts. The LLM reads your sources, writes summary pages, maintains cross-references, and weaves a persistent wiki that compounds over time. Includes a 4-phase in-session deep-research skill (PLANNER → SEARCHER → SECTION WRITERS → EDITOR) that drops cited 3-5K-word syntheses into your Inbox, local zero-shot classification (DeBERTa-v3 ONNX, no API dependency) for routing + source-type tagging, indexer pre-flight gates that refuse to ship malformed documents, and a synthetic test harness that catches contract drift before real runs. Slash commands prefixed with /pw: for brevity. Marketplace + brand remain 'paperwik'; only the plugin identifier is short.",
   "version": "0.7.1",
   "author": {
     "name": "s0phak1ng",

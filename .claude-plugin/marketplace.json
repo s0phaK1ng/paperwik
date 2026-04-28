@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "paperwik",
   "version": "0.7.1",
-  "description": "Paperwik marketplace - a single-plugin marketplace that publishes the Paperwik agent-maintained Obsidian knowledge base plugin.",
+  "description": "Paperwik marketplace — single-plugin marketplace publishing the Paperwik agent-maintained Obsidian knowledge base plugin (deep research, ZSC routing, tooling-enforced contracts).",
   "owner": {
     "name": "s0phak1ng",
     "url": "https://github.com/s0phak1ng"
@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "pw",
-      "description": "Agent-maintained Obsidian knowledge base. The LLM reads your sources, writes summary pages, maintains cross-references, and builds a persistent wiki that compounds over time. Non-technical Windows users never touch a terminal command beyond 'ingest this' or 'what do I know about X'.",
+      "description": "Agent-maintained Obsidian knowledge base for non-technical Windows users. The LLM reads your sources, writes summary pages, maintains cross-references, and weaves a persistent wiki that compounds over time. Includes a 4-phase in-session deep-research skill (PLANNER → SEARCHER → parallel SECTION WRITERS → EDITOR; drops 3-5K-word cited syntheses into Inbox), local zero-shot classification (DeBERTa-v3 ONNX) for project routing + source-type tagging with NO Anthropic API dependency, indexer pre-flight gates that refuse to ship malformed documents, compaction-resilient memory hooks, silent Git autosave, and a synthetic test harness that catches contract drift before real research runs. Users never touch a terminal command beyond 'ingest this' or 'research X thoroughly'.",
       "version": "0.7.1",
       "source": {
         "source": "url",
@@ -25,6 +25,10 @@
         "knowledge-base",
         "wiki",
         "retrieval",
+        "rag",
+        "deep-research",
+        "zero-shot-classification",
+        "onnx",
         "non-technical",
         "windows"
       ]
